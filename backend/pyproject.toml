@@ -1,0 +1,22 @@
+[project]
+name = "starcast-backend"
+version = "0.1.0"
+description = "StarCast API — computes visible celestial bodies and narrates a cosmic weather report"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
