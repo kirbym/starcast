@@ -89,5 +89,5 @@ The default view of the Cosmic Report: the Headline and up to three Highlight Ca
 _Avoid_: "summary view", "simple view", "top-level view"
 
 **Detail Layer**:
-The expanded view accessible per Highlight Card that surfaces positional and observational data: altitude, azimuth, rise/set times, magnitude, and a full list of all Visible objects for the night.
+Two parts: (1) per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card, and (2) a single list of all Visible objects for the night, shown once, independent of any one card. Neither part duplicates the other's content.
 _Avoid_: "advanced view", "expanded view", "data view"
