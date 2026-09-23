@@ -56,6 +56,10 @@ _Avoid_: "title", "lede", "summary"
 One entry in the Cosmic Report corresponding to one Highlight. Contains a mini-headline and a 2–4 sentence paragraph written in a conversational tone with poetic flourishes.
 _Avoid_: "card", "entry", "story", "highlight story"
 
+**Quiet Night**:
+A night on which no catalog body is Visible during the Viewing Window. The Cosmic Report still has a generated Headline but zero Highlight Cards. A Quiet Night is a normal report, not an error.
+_Avoid_: "empty night", "empty report", "no results"
+
 ### Catalog Objects
 
 **Planet**:
