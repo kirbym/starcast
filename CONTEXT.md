@@ -41,7 +41,10 @@ A time-sensitive astronomical occurrence detected for the current night: a conju
 _Avoid_: "special event", "astronomical event", "rare event"
 
 **Visual Priority**:
-The ranking used to select one Highlight from multiple Visible candidates within the same Category. For planets: outer gas giants rank above inner rocky planets; the Moon is treated as a wildcard and may be elevated. Ties are broken by Peak Altitude.
+The ranking used to select one Highlight from multiple Visible candidates within the same Category. Ties in every Category are broken by Peak Altitude.
+- **Category 1**: outer gas giants rank above inner rocky planets. The Moon is a wildcard: when it is Visible and at least 50% illuminated, it ranks above every Planet; otherwise it ranks below every Planet.
+- **Category 2**: the Named Constellation with the highest Peak Altitude.
+- **Category 3**: a Significant Event always wins. Otherwise Bright Stars, Named Comets and DSOs compete together, ranked by brightness (lowest magnitude first), then Peak Altitude.
 _Avoid_: "importance", "ranking score", "priority score"
 
 **Cosmic Report**:
@@ -67,7 +70,7 @@ Any of the eight solar-system planets (Mercury through Neptune). Treated as a Ca
 _Avoid_: "solar body", "planet candidate"
 
 **Moon**:
-Earth's natural satellite. Treated as a Category 1 candidate and may override a Planet via Visual Priority depending on its phase and prominence that night.
+Earth's natural satellite. Treated as a Category 1 candidate and outranks every Planet via Visual Priority on nights when it is Visible and at least 50% illuminated.
 _Avoid_: "lunar body", "the Moon" (use just "Moon" in code/copy)
 
 **Named Constellation**:
