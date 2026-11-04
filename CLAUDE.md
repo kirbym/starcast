@@ -16,24 +16,36 @@ The project uses Python. The .gitignore includes patterns for:
 
 ## Development Commands
 
-> No code exists yet. Update this section once the project is initialized.
+Settings for both deployables live in a root `.env` (copy `.env.example`).
 
-Typical commands once set up:
+### Backend (`backend/`)
 
 ```bash
-# Install dependencies
-uv sync          # or: pip install -e ".[dev]"
+uv sync                                                # install dependencies
+uv run --env-file ../.env uvicorn app.main:app --reload   # run the API on port 8000
 
-# Run the app
-python -m starcast   # or framework-specific command
+uv run ruff check .                                    # lint
+uv run ruff format .                                   # format
 
-# Lint
-ruff check .
-ruff format .
+uv run pytest                                          # all tests
+uv run pytest tests/test_astronomy.py::test_name       # single test
+```
 
-# Tests
-pytest
-pytest tests/test_specific.py::test_name   # single test
+The first astronomy run downloads the DE440s ephemeris (~32 MB) to `backend/.cache/skyfield`, or to `STARCAST_DATA_DIR` if set.
+
+`tests/test_claude_narrator.py` has one opt-in test that calls the real Claude API. It is skipped unless `ANTHROPIC_API_KEY` is set.
+
+### Frontend (`frontend/`)
+
+```bash
+npm ci                                  # install dependencies
+npm run dev                             # run the app on port 5173
+
+npm run typecheck                       # typecheck
+npm run lint                            # lint
+
+npm test                                # all tests
+npx vitest run src/App.test.tsx -t "name"   # single test
 ```
 
 ## Agent skills
