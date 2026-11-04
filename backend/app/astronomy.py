@@ -11,12 +11,12 @@ from zoneinfo import ZoneInfo
 from skyfield import almanac
 from skyfield.api import Loader, load, wgs84
 from skyfield.jpllib import SpiceKernel
-from skyfield.searchlib import find_minima
 from skyfield.timelib import Time
 from skyfield.toposlib import GeographicPosition
 
 EPHEMERIS_FILE = "de440s.bsp"
 DARK = 0  # The code almanac.dark_twilight_day() uses for "Sun below -18 degrees".
+_MINUTES_IN_SEARCH = 24 * 60 + 1
 
 _DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / ".cache" / "skyfield"
 _timescale = load.timescale(builtin=True)
@@ -55,8 +55,8 @@ def _viewing_window(latitude: float, longitude: float, local_noon: datetime) -> 
     """Find the night's span of full darkness between local noon and the next local noon.
 
     Two kinds of night have no dusk or no dawn to find:
-    - If it is never fully dark, the window has zero length at the darkest moment. Nothing can
-      be Visible in it, so the report is a Quiet Night.
+    - If it is never fully dark, the window has zero length at the darkest moment. That marks a
+      night with no darkness to observe in, so it must always produce a Quiet Night.
     - If it is dark all the way through (polar night), the window is the whole search span.
     """
     ephemeris = _ephemeris()
@@ -85,15 +85,11 @@ def _viewing_window(latitude: float, longitude: float, local_noon: datetime) -> 
 def _darkest_moment(
     ephemeris: SpiceKernel, location: GeographicPosition, search_start: Time, search_end: Time
 ) -> datetime:
+    """Scan the span minute by minute: near the poles the Sun may have no daily low point."""
     observer = ephemeris["earth"] + location
-    sun = ephemeris["sun"]
-
-    def sun_altitude(moment: Time) -> Any:
-        return observer.at(moment).observe(sun).apparent().altaz()[0].degrees
-
-    sun_altitude.step_days = 0.04
-    times, altitudes = find_minima(search_start, search_end, sun_altitude)
-    return _to_utc(times[altitudes.argmin()])
+    times = _timescale.linspace(search_start, search_end, _MINUTES_IN_SEARCH)
+    altitudes = observer.at(times).observe(ephemeris["sun"]).apparent().altaz()[0].degrees
+    return _to_utc(times[int(altitudes.argmin())])
 
 
 def _to_utc(moment: Time) -> datetime:

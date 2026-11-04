@@ -99,8 +99,9 @@ class Narrator(Protocol):
 
 
 class ClaudeNarrator:
-    def __init__(self, client: Anthropic | None = None) -> None:
-        self._client = client or Anthropic()
+    def __init__(self) -> None:
+        # Retrying is the endpoint's job, and the spec allows it only once.
+        self._client = Anthropic(max_retries=0)
 
     def narrate(self, highlights: Sequence[Mapping[str, Any]]) -> Narration:
         response = self._client.beta.messages.create(

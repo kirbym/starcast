@@ -76,6 +76,26 @@ def test_night_at_lower_latitude_can_also_lack_astronomical_darkness():
     assert sky.viewing_window.starts_at == sky.viewing_window.ends_at
 
 
+@pytest.mark.parametrize(
+    ("latitude", "night"),
+    [
+        pytest.param(90.0, date(2026, 6, 21), id="north-pole-midsummer"),
+        pytest.param(-90.0, date(2026, 12, 21), id="south-pole-midsummer"),
+        pytest.param(90.0, date(2026, 4, 15), id="north-pole-spring"),
+        pytest.param(89.99, date(2026, 8, 20), id="near-north-pole-late-summer"),
+    ],
+)
+def test_night_without_astronomical_darkness_at_the_poles_has_zero_length_viewing_window(
+    latitude, night
+):
+    # The Sun's altitude barely changes over a polar day, so it may have no daily low point.
+    sky = compute_night_sky(latitude, 0.0, "Etc/UTC", night)
+
+    window = sky.viewing_window
+    assert window.starts_at == window.ends_at
+    assert datetime(night.year, night.month, night.day, 12, tzinfo=UTC) <= window.starts_at
+
+
 def test_polar_night_viewing_window_spans_local_noon_to_local_noon():
     # The South Pole at midwinter: the Sun stays near -23.4 degrees all day.
     sky = compute_night_sky(-90.0, 0.0, "Antarctica/South_Pole", date(2026, 6, 21))
