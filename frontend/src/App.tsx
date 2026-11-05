@@ -1,121 +1,75 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
+type ReportState =
+  | { status: 'loading' }
+  | { status: 'ready'; headline: string }
+  | { status: 'failed' }
+
+function localDate(now: Date): string {
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+async function fetchHeadline(coords: GeolocationCoordinates): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/api/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      date: localDate(new Date()),
+      location_label: null,
+    }),
+  })
+  if (!response.ok) {
+    throw new Error(`Report request failed with status ${response.status}`)
+  }
+  const report: { headline: string } = await response.json()
+  return report.headline
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [report, setReport] = useState<ReportState>({ status: 'loading' })
+
+  useEffect(() => {
+    // StrictMode runs this effect twice. Only the surviving run may call the
+    // API, because every report request is a paid Claude call.
+    let stale = false
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        if (stale) return
+        try {
+          const headline = await fetchHeadline(coords)
+          if (!stale) setReport({ status: 'ready', headline })
+        } catch (error) {
+          console.error(error)
+          if (!stale) setReport({ status: 'failed' })
+        }
+      },
+      () => {
+        if (!stale) setReport({ status: 'failed' })
+      },
+    )
+
+    return () => {
+      stale = true
+    }
+  }, [])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <main>
+      {report.status === 'loading' && <p>Reading tonight's sky…</p>}
+      {report.status === 'ready' && <h1>{report.headline}</h1>}
+      {report.status === 'failed' && (
+        <p role="alert">Tonight's sky is out of reach right now.</p>
+      )}
+    </main>
   )
 }
 
