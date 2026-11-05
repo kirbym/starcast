@@ -8,9 +8,8 @@ from typing import Any, Protocol
 from anthropic import Anthropic
 from pydantic import BaseModel
 
-# Issue #10 specified forced tool-use at temperature 0.9. The current Sonnet rejects forced
-# tool_choice and sampling parameters with a 400, so the JSON shape is enforced with structured
-# output instead, and sampling is left at the model's default.
+# Structured output enforces the JSON shape because the current Sonnet rejects forced tool_choice
+# with a 400. It rejects sampling parameters too, so sampling stays at the model's default.
 MODEL = "claude-sonnet-5-5"
 MAX_TOKENS = 1024
 SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -110,7 +109,7 @@ class ClaudeNarrator:
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": json.dumps(list(highlights))}],
             output_config={"format": {"type": "json_schema", "schema": NARRATION_SCHEMA}},
-            # Sonnet thinks by default, and thinking would count against MAX_TOKENS.
+            # Sonnet thinks by default. Off saves tokens, and thinking counts against MAX_TOKENS.
             thinking={"type": "between_tools"},
             betas=[SERVER_SIDE_FALLBACK_BETA],
             fallbacks="default",
