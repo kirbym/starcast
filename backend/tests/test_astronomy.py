@@ -157,10 +157,15 @@ def test_body_that_neither_rises_nor_sets_tonight_has_null_rise_and_set_times():
     assert moon.sets_at is None
 
 
-def category_1_highlight(sky):
-    picks = [body for body in sky.highlights if body.category == "planet_moon"]
+def highlight_in(sky, category: str):
+    """The night's one Highlight in a Category, or None."""
+    picks = [body for body in sky.highlights if body.category == category]
     assert len(picks) <= 1
     return picks[0] if picks else None
+
+
+def category_1_highlight(sky):
+    return highlight_in(sky, "planet_moon")
 
 
 def test_gas_giant_outranks_a_higher_rocky_planet():
@@ -224,7 +229,9 @@ def test_all_88_named_constellations_are_in_catalog():
         assert body.magnitude is None
         assert body.name
     names = {body.name for body in seen}
-    assert {"Orion", "Ursa Major", "Crux", "Boötes", "Serpens"} <= names
+    # IAU spellings, including the ones Astropy's boundary table gets wrong.
+    iau_spellings = {"Boötes", "Chamaeleon", "Ophiuchus", "Piscis Austrinus"}
+    assert {"Orion", "Ursa Major", "Crux", "Serpens"} | iau_spellings <= names
 
 
 def test_circumpolar_constellation_is_visible_without_rising_or_setting():
@@ -263,9 +270,7 @@ def test_visible_constellation_carries_its_positional_fields():
 
 
 def category_2_highlight(sky):
-    picks = [body for body in sky.highlights if body.category == "constellation"]
-    assert len(picks) <= 1
-    return picks[0] if picks else None
+    return highlight_in(sky, "constellation")
 
 
 @pytest.mark.parametrize(

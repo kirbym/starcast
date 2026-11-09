@@ -195,7 +195,7 @@ def test_constellation_highlight_is_narrated_alongside_the_planet(client: TestCl
     assert constellation["paragraph"] == "A story about Andromeda."
 
 
-def test_cards_are_merged_by_id_whatever_order_the_narrator_returns_them_in(
+def test_highlight_cards_are_merged_by_id_whatever_order_the_narrator_returns_them_in(
     client: TestClient, narrator: FakeNarrator
 ):
     narrator.cards = [
@@ -206,10 +206,10 @@ def test_cards_are_merged_by_id_whatever_order_the_narrator_returns_them_in(
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     assert response.status_code == 200
-    cards = {
+    mini_headlines = {
         highlight["id"]: highlight["mini_headline"] for highlight in response.json()["highlights"]
     }
-    assert cards == {
+    assert mini_headlines == {
         "planet:jupiter": "The king rises",
         "constellation:and": "The chained princess",
     }

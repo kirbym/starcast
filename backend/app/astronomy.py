@@ -161,7 +161,7 @@ def compute_night_sky(
     planets_and_moon = _observe_visible(_SOLAR_SYSTEM, observer, samples)
     constellations = _observe_visible(_CONSTELLATIONS, observer, samples)
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
-    category_2 = max(constellations, key=_peak_altitude, default=None)
+    category_2 = max(constellations, key=_category_2_priority, default=None)
     return NightSky(
         viewing_window=window,
         highlights=[seen.body for seen in (category_1, category_2) if seen],
@@ -182,7 +182,7 @@ def _observe_visible(
     return [seen for body in catalog if (seen := _observe(body, observer, samples))]
 
 
-def _peak_altitude(seen: _Observation) -> float:
+def _category_2_priority(seen: _Observation) -> float:
     """Visual Priority for Category 2: the highest Peak Altitude wins."""
     return seen.body.peak_altitude_degrees
 

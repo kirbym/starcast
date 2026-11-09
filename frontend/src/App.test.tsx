@@ -499,7 +499,7 @@ const ANDROMEDA = {
   event: null,
 }
 
-test('shows a planet card and a constellation card together, in Category order', async () => {
+test('shows a planet and a constellation Highlight Card together, in Category order', async () => {
   fakeGeolocation((success) =>
     success({
       coords: { latitude: 40.72, longitude: -74.0 },
