@@ -157,10 +157,15 @@ def test_body_that_neither_rises_nor_sets_tonight_has_null_rise_and_set_times():
     assert moon.sets_at is None
 
 
-def category_1_highlight(sky):
-    picks = [body for body in sky.highlights if body.category == "planet_moon"]
+def highlight_in(sky, category: str):
+    """The night's one Highlight in a Category, or None."""
+    picks = [body for body in sky.highlights if body.category == category]
     assert len(picks) <= 1
     return picks[0] if picks else None
+
+
+def category_1_highlight(sky):
+    return highlight_in(sky, "planet_moon")
 
 
 def test_gas_giant_outranks_a_higher_rocky_planet():
@@ -201,3 +206,91 @@ def test_peak_altitude_breaks_a_tie_between_equally_ranked_planets():
     assert saturn.peak_altitude_degrees > jupiter.peak_altitude_degrees
 
     assert category_1_highlight(sky).id == "planet:saturn"
+
+
+TROMSO = (69.65, 18.96)
+
+
+def constellations(sky) -> list:
+    return [body for body in sky.visible_objects if body.object_type == "constellation"]
+
+
+def test_all_88_named_constellations_are_in_catalog():
+    # On a polar night every Centroid north of the celestial equator circles the North Pole, and
+    # every one south of it circles the South Pole, so the two nights together show all 88.
+    north = compute_night_sky(90.0, 0.0, "Etc/UTC", date(2026, 12, 21))
+    south = compute_night_sky(-90.0, 0.0, "Etc/UTC", date(2026, 6, 21))
+    seen = constellations(north) + constellations(south)
+
+    assert len({body.id for body in seen}) == 88
+    for body in seen:
+        assert body.id.startswith("constellation:")
+        assert body.category == "constellation"
+        assert body.magnitude is None
+        assert body.name
+    names = {body.name for body in seen}
+    # IAU spellings, including the ones Astropy's boundary table gets wrong.
+    iau_spellings = {"Boötes", "Chamaeleon", "Ophiuchus", "Piscis Austrinus"}
+    assert {"Orion", "Ursa Major", "Crux", "Serpens"} | iau_spellings <= names
+
+
+def test_circumpolar_constellation_is_visible_without_rising_or_setting():
+    # Ursa Minor's Centroid sits near declination +77, so from Tromso (69.65 N) it never sets.
+    sky = compute_night_sky(*TROMSO, "Europe/Oslo", date(2026, 12, 22))
+
+    ursa_minor = visible_body(sky, "constellation:umi")
+    assert ursa_minor.name == "Ursa Minor"
+    assert ursa_minor.peak_altitude_degrees > 60
+    assert ursa_minor.rises_at is None
+    assert ursa_minor.sets_at is None
+
+
+def test_constellation_that_never_rises_is_absent():
+    # Crux and Octans have Centroids near declinations -60 and -85. From Tromso (69.65 N),
+    # nothing south of -20.35 ever clears the horizon.
+    sky = compute_night_sky(*TROMSO, "Europe/Oslo", date(2026, 12, 22))
+
+    assert "constellation:cru" not in visible_ids(sky)
+    assert "constellation:oct" not in visible_ids(sky)
+
+
+def test_visible_constellation_carries_its_positional_fields():
+    # Early November from New York: Orion rises in the late evening and stands high in the south
+    # before dawn. Its Centroid (declination about +5) can climb to about 54 degrees here.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+
+    orion = visible_body(sky, "constellation:ori")
+    assert orion.name == "Orion"
+    assert orion.object_type == "constellation"
+    assert 40 < orion.peak_altitude_degrees < 55
+    assert 0 <= orion.azimuth_at_peak_degrees < 360
+    window = sky.viewing_window
+    assert orion.rises_at is not None and window.starts_at < orion.rises_at < window.ends_at
+    assert orion.sets_at is not None and orion.sets_at > window.ends_at
+
+
+def category_2_highlight(sky):
+    return highlight_in(sky, "constellation")
+
+
+@pytest.mark.parametrize(
+    ("location", "timezone", "night"),
+    [
+        pytest.param(NEW_YORK, "America/New_York", date(2026, 11, 5), id="new-york-autumn"),
+        pytest.param(SYDNEY, "Australia/Sydney", date(2026, 6, 21), id="sydney-winter"),
+        pytest.param(TROMSO, "Europe/Oslo", date(2026, 12, 22), id="tromso-polar-night"),
+    ],
+)
+def test_category_2_is_the_visible_constellation_with_the_highest_peak_altitude(
+    location, timezone, night
+):
+    sky = compute_night_sky(*location, timezone, night)
+
+    highest = max(constellations(sky), key=lambda body: body.peak_altitude_degrees)
+    assert category_2_highlight(sky) == highest
+
+
+def test_category_1_and_category_2_highlights_appear_together_in_category_order():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+
+    assert [body.category for body in sky.highlights] == ["planet_moon", "constellation"]

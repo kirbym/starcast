@@ -486,6 +486,64 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
   }
 })
 
+const ANDROMEDA = {
+  id: 'constellation:and',
+  category: 'constellation',
+  object_type: 'constellation',
+  name: 'Andromeda',
+  peak_altitude_degrees: 89.7,
+  azimuth_at_peak_degrees: 351.4,
+  rises_at: '2026-11-05T12:10:02Z',
+  sets_at: '2026-11-06T09:41:37Z',
+  magnitude: null,
+  event: null,
+}
+
+test('shows a planet and a constellation Highlight Card together, in Category order', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'Jupiter rules the small hours while Andromeda passes overhead.',
+        highlights: [
+          {
+            ...JUPITER,
+            mini_headline: 'The king climbs the east',
+            paragraph: 'Jupiter rises late and climbs high before dawn.',
+          },
+          {
+            ...ANDROMEDA,
+            mini_headline: 'The chained princess overhead',
+            paragraph: 'Andromeda sails straight overhead in the evening, chained to her rock.',
+          },
+        ],
+        visible_objects: [JUPITER, ANDROMEDA],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const constellation = await screen.findByRole('article', {
+    name: 'The chained princess overhead',
+  })
+  expect(constellation).toHaveTextContent(
+    'Andromeda sails straight overhead in the evening, chained to her rock.',
+  )
+  const headings = screen
+    .getAllByRole('article')
+    .map((card) => card.querySelector('h2')?.textContent)
+  expect(headings).toEqual(['The king climbs the east', 'The chained princess overhead'])
+  for (const number of ['89.7', '351.4', '12:10', '09:41']) {
+    expect(document.body).not.toHaveTextContent(number)
+  }
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({
