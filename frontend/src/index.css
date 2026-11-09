@@ -25,3 +25,27 @@ h1 {
   font-size: clamp(1.75rem, 5vw, 2.5rem);
   font-weight: 600;
 }
+
+.highlights {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.highlight-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid #2a2d4a;
+  border-radius: 0.75rem;
+  background: #13162b;
+}
+
+.highlight-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.highlight-card p {
+  margin: 0;
+  color: #c9c6dc;
+}

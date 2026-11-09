@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { type Highlight, HighlightList } from './HighlightList.tsx'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
+type Report = { headline: string; highlights: Highlight[] }
+
 type ReportState =
   | { status: 'loading' }
-  | { status: 'ready'; headline: string }
+  | { status: 'ready'; report: Report }
   | { status: 'failed' }
 
 function localDate(now: Date): string {
@@ -14,7 +17,7 @@ function localDate(now: Date): string {
   return `${year}-${month}-${day}`
 }
 
-async function fetchHeadline(coords: GeolocationCoordinates): Promise<string> {
+async function fetchReport(coords: GeolocationCoordinates): Promise<Report> {
   const response = await fetch(`${API_BASE_URL}/api/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,8 +32,7 @@ async function fetchHeadline(coords: GeolocationCoordinates): Promise<string> {
   if (!response.ok) {
     throw new Error(`Report request failed with status ${response.status}`)
   }
-  const report: { headline: string } = await response.json()
-  return report.headline
+  return response.json()
 }
 
 function App() {
@@ -45,8 +47,8 @@ function App() {
       async ({ coords }) => {
         if (stale) return
         try {
-          const headline = await fetchHeadline(coords)
-          if (!stale) setReport({ status: 'ready', headline })
+          const fetched = await fetchReport(coords)
+          if (!stale) setReport({ status: 'ready', report: fetched })
         } catch (error) {
           console.error(error)
           if (!stale) setReport({ status: 'failed' })
@@ -65,7 +67,12 @@ function App() {
   return (
     <main>
       {report.status === 'loading' && <p>Reading tonight's sky…</p>}
-      {report.status === 'ready' && <h1>{report.headline}</h1>}
+      {report.status === 'ready' && (
+        <>
+          <h1>{report.report.headline}</h1>
+          <HighlightList highlights={report.report.highlights} />
+        </>
+      )}
       {report.status === 'failed' && (
         <p role="alert">Tonight's sky is out of reach right now.</p>
       )}
