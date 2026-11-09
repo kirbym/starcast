@@ -22,7 +22,8 @@ QUIET_NIGHT_REQUEST = {
     "date": "2026-06-21",
     "location_label": None,
 }
-# New York on 2026-11-05: Jupiter is the Category 1 Highlight, among other Visible bodies.
+# New York on 2026-11-05: Jupiter is the Category 1 Highlight and Andromeda, passing almost
+# overhead, the Category 2 Highlight, among other Visible bodies.
 JUPITER_NIGHT_REQUEST = {**VALID_REQUEST, "date": "2026-11-05"}
 
 
@@ -167,7 +168,7 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     assert response.status_code == 200
-    [highlight] = response.json()["highlights"]
+    [highlight, _constellation] = response.json()["highlights"]
     assert set(highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert highlight["id"] == "planet:jupiter"
     assert highlight["category"] == "planet_moon"
@@ -179,13 +180,51 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", highlight["rises_at"])
 
 
+def test_constellation_highlight_is_narrated_alongside_the_planet(client: TestClient):
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert response.status_code == 200
+    [planet, constellation] = response.json()["highlights"]
+    assert planet["id"] == "planet:jupiter"
+    assert constellation["id"] == "constellation:and"
+    assert constellation["category"] == "constellation"
+    assert constellation["object_type"] == "constellation"
+    assert constellation["name"] == "Andromeda"
+    assert constellation["magnitude"] is None
+    assert constellation["mini_headline"] == "Andromeda takes the stage"
+    assert constellation["paragraph"] == "A story about Andromeda."
+
+
+def test_cards_are_merged_by_id_whatever_order_the_narrator_returns_them_in(
+    client: TestClient, narrator: FakeNarrator
+):
+    narrator.cards = [
+        NarrationCard(id="constellation:and", mini_headline="The chained princess", paragraph="A."),
+        NarrationCard(id="planet:jupiter", mini_headline="The king rises", paragraph="J."),
+    ]
+
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert response.status_code == 200
+    cards = {
+        highlight["id"]: highlight["mini_headline"] for highlight in response.json()["highlights"]
+    }
+    assert cards == {
+        "planet:jupiter": "The king rises",
+        "constellation:and": "The chained princess",
+    }
+
+
 def test_narrator_receives_raw_fields_of_each_highlight(client: TestClient, narrator: FakeNarrator):
     client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
-    [received] = narrator.received
-    assert set(received) == POSITIONAL_FIELDS
-    assert received["id"] == "planet:jupiter"
-    assert isinstance(received["rises_at"], str)
+    assert [received["id"] for received in narrator.received] == [
+        "planet:jupiter",
+        "constellation:and",
+    ]
+    for received in narrator.received:
+        assert set(received) == POSITIONAL_FIELDS
+        assert isinstance(received["rises_at"], str)
 
 
 def test_every_visible_body_is_listed_with_highlights_included(client: TestClient):
@@ -194,10 +233,13 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
     visible = response.json()["visible_objects"]
     ids = {body["id"] for body in visible}
     assert {"planet:jupiter", "planet:mars", "planet:saturn", "moon:moon"} <= ids
+    assert {"constellation:and", "constellation:ori", "constellation:uma"} <= ids
     assert "planet:venus" not in ids
+    assert "constellation:cru" not in ids
     for body in visible:
         assert set(body) == POSITIONAL_FIELDS
-        assert body["category"] == "planet_moon"
+        expected = "constellation" if body["object_type"] == "constellation" else "planet_moon"
+        assert body["category"] == expected
 
 
 @pytest.mark.parametrize(
