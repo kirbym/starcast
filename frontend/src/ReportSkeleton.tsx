@@ -1,7 +1,7 @@
 /**
  * Placeholder for a Cosmic Report while it loads: a Headline and three
- * Highlight Cards built from the same boxes as the real report, so nothing
- * moves when the content arrives.
+ * Highlight Cards built from the same boxes as the real report (see
+ * HighlightList), so nothing moves when the content arrives.
  */
 function ReportSkeleton() {
   return (
@@ -16,20 +16,20 @@ function ReportSkeleton() {
         <span className="skeleton-line" />
         <span className="skeleton-line skeleton-line-short" />
       </div>
-      <ul className="highlight-list" aria-hidden="true">
+      <div className="highlights" aria-hidden="true">
         {[0, 1, 2].map((slot) => (
-          <li key={slot} className="highlight-card">
-            <div className="mini-headline">
+          <div key={slot} className="highlight-card">
+            <div className="highlight-card-heading">
               <span className="skeleton-line skeleton-line-short" />
             </div>
-            <div className="highlight-paragraph">
+            <div className="highlight-card-paragraph">
               <span className="skeleton-line" />
               <span className="skeleton-line" />
               <span className="skeleton-line skeleton-line-short" />
             </div>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   )
 }

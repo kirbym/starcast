@@ -434,3 +434,68 @@ test('asks where you are stargazing when the location prompt goes unanswered', a
   ).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '📍 Set location' })).toBeInTheDocument()
 })
+
+const JUPITER = {
+  id: 'planet:jupiter',
+  category: 'planet_moon',
+  object_type: 'planet',
+  name: 'Jupiter',
+  peak_altitude_degrees: 54.8,
+  azimuth_at_peak_degrees: 132.2,
+  rises_at: '2026-11-06T04:51:49Z',
+  sets_at: '2026-11-06T18:30:12Z',
+  magnitude: -2.03,
+  event: null,
+}
+
+test('shows a Highlight Card for each Highlight, without positional numbers', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'Jupiter rules the small hours.',
+        highlights: [
+          {
+            ...JUPITER,
+            mini_headline: 'The king climbs the east',
+            paragraph:
+              'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
+          },
+        ],
+        visible_objects: [JUPITER],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const card = await screen.findByRole('article', {
+    name: 'The king climbs the east',
+  })
+  expect(card).toHaveTextContent(
+    'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
+  )
+  expect(screen.getAllByRole('article')).toHaveLength(1)
+  for (const number of ['54.8', '132.2', '-2.03', '04:51', '18:30']) {
+    expect(document.body).not.toHaveTextContent(number)
+  }
+})
+
+test('shows no Highlight Cards on a Quiet Night', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 69.65, longitude: 18.96 },
+    } as GeolocationPosition),
+  )
+  server.use(http.post(REPORT_URL, () => HttpResponse.json(QUIET_NIGHT)))
+
+  renderApp()
+
+  await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
+  expect(screen.queryByRole('article')).not.toBeInTheDocument()
+})

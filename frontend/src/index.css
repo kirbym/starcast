@@ -114,11 +114,6 @@ main {
 /* Cosmic Report. The skeleton reuses these boxes, so they define the layout
    for both the loading and the loaded state. */
 
-.report {
-  display: grid;
-  gap: 2rem;
-}
-
 h1,
 .headline {
   margin: 0;
@@ -126,29 +121,30 @@ h1,
   font-weight: 600;
 }
 
-.highlight-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.highlights {
   display: grid;
   gap: 1rem;
+  margin-top: 2rem;
 }
 
 .highlight-card {
-  padding: 1.25rem;
-  border: 1px solid var(--border);
+  padding: 1rem 1.25rem;
+  border: 1px solid #2a2d4a;
   border-radius: 0.75rem;
-  background: var(--surface);
+  background: #13162b;
 }
 
-.mini-headline {
+.highlight-card h2,
+.highlight-card-heading {
   margin: 0 0 0.5rem;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 600;
 }
 
-.highlight-paragraph {
+.highlight-card p,
+.highlight-card-paragraph {
   margin: 0;
+  color: #c9c6dc;
 }
 
 /* Skeleton. Each line is exactly one line box tall (the root line-height),

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { HighlightList } from './HighlightList.tsx'
 import { loadSavedLocation, saveLocation, type Location } from './location.ts'
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
@@ -104,9 +105,10 @@ function App() {
           <ReportSkeleton />
         )}
         {report.status === 'ready' && (
-          <article className="report">
+          <div className="report">
             <h1 className="headline">{report.report.headline}</h1>
-          </article>
+            <HighlightList highlights={report.report.highlights} />
+          </div>
         )}
         {report.status === 'failed' && (
           <p role="alert">Tonight's sky is out of reach right now.</p>
