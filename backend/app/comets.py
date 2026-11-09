@@ -79,10 +79,12 @@ def named_comet_elements(cache_dir: Path) -> dict[str, CometElements]:
 
 @lru_cache
 def _cache_in(cache_dir: Path) -> "MpcElementsCache":
+    """One cache per directory for the life of the process, so its retry back-off persists."""
     return MpcElementsCache(cache_dir / ELEMENTS_FILE)
 
 
 def _download() -> bytes:
+    """Fetch AllCometEls.txt from the MPC."""
     with urllib.request.urlopen(ELEMENTS_URL, timeout=_DOWNLOAD_TIMEOUT_SECONDS) as response:
         return response.read()
 
@@ -112,7 +114,7 @@ class MpcElementsCache:
     def _is_fresh(self) -> bool:
         try:
             modified = datetime.fromtimestamp(self._path.stat().st_mtime, UTC)
-        except FileNotFoundError:
+        except OSError:
             return False
         return self._clock() - modified <= MAX_AGE
 
@@ -125,14 +127,14 @@ class MpcElementsCache:
             content = self._fetch()
             if not _parse_named(content):
                 raise ValueError("no Named Comet found in the downloaded elements")
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            partial = self._path.with_suffix(".part")
+            partial.write_bytes(content)
+            partial.replace(self._path)
         except Exception:
-            _log.warning("Could not download comet elements from %s", ELEMENTS_URL, exc_info=True)
+            _log.warning("Could not refresh comet elements from %s", ELEMENTS_URL, exc_info=True)
             self._failed_at = now
             return False
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        partial = self._path.with_suffix(".part")
-        partial.write_bytes(content)
-        partial.replace(self._path)
         self._failed_at = None
         return True
 
@@ -149,7 +151,12 @@ def _read_elements(path: Path) -> dict[str, CometElements]:
 @lru_cache(maxsize=4)
 def _read_elements_version(path: Path, _mtime_ns: int, _size: int) -> dict[str, CometElements]:
     """Parse one version of an elements file; a new modification time or size parses again."""
-    elements = _parse_named(path.read_bytes())
+    try:
+        content = path.read_bytes()
+    except OSError:
+        _log.warning("Could not read the comet elements at %s", path, exc_info=True)
+        return {}
+    elements = _parse_named(content)
     if not elements:
         _log.warning("No Named Comet found in the comet elements at %s", path)
     return elements

@@ -1,6 +1,7 @@
 """The astronomy engine: location + timezone + date -> the night's computed sky."""
 
 import csv
+import logging
 import math
 import os
 from collections.abc import Mapping
@@ -22,6 +23,8 @@ from skyfield.toposlib import GeographicPosition
 from skyfield.vectorlib import VectorFunction
 
 from app.comets import NAMED_COMETS, CometElements, NamedComet, named_comet_elements
+
+_log = logging.getLogger(__name__)
 
 EPHEMERIS_FILE = "de440s.bsp"
 DARK = 0  # The code almanac.dark_twilight_day() uses for "Sun below -18 degrees".
@@ -319,8 +322,7 @@ def _observe_visible(
     observed = []
     for body in bodies:
         if isinstance(body.target, NamedComet):
-            elements = (comet_elements or {}).get(body.target.designation)
-            seen = None if elements is None else _observe_comet(body, elements, observer, samples)
+            seen = _observe_named_comet(body, comet_elements or {}, observer, samples)
         else:
             seen = _observe(body, observer, samples)
         if seen:
@@ -328,8 +330,22 @@ def _observe_visible(
     return observed
 
 
+def _observe_named_comet(
+    body: CatalogBody, comet_elements: Mapping[str, CometElements], observer, samples: Time
+) -> _Observation | None:
+    """Place one Named Comet, leaving it out if its elements are missing or unusable."""
+    elements = comet_elements.get(body.target.designation)
+    if elements is None:
+        return None
+    try:
+        return _observe_comet(body, elements, observer, samples)
+    except Exception:
+        _log.warning("Could not place %s from its orbital elements", body.id, exc_info=True)
+        return None
+
+
 def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
-    """The Named Comets' orbital elements, if the catalog has any comets to place."""
+    """The Named Comets' orbital elements, if the catalog has any Named Comets to place."""
     if not any(isinstance(body.target, NamedComet) for body in catalog.featured):
         return {}
     return named_comet_elements(data_dir())
@@ -395,9 +411,9 @@ def _observe(body: CatalogBody, observer, samples: Time) -> _Observation | None:
 def _observe_comet(
     body: CatalogBody, elements: CometElements, observer, samples: Time
 ) -> _Observation | None:
-    """Place a Named Comet from its orbital elements, or None if it is not Visible tonight.
+    """Place a Named Comet from its orbital elements, or None if it is not Visible that night.
 
-    A comet counts only when it is no fainter than the naked-eye limit at its Peak Altitude.
+    A Named Comet counts only when it is no fainter than the naked-eye limit at its Peak Altitude.
     """
     # MPC comet orbits are centred on the Sun, not on the Solar System's barycenter.
     orbit = mpc.comet_orbit(elements, _timescale, GM_SUN)
@@ -416,6 +432,8 @@ def _observe_comet(
 
 @dataclass(frozen=True)
 class _Peak:
+    """A body's highest point among the night's sample times."""
+
     time: Time
     altitude_degrees: float
     azimuth_degrees: float
@@ -433,6 +451,7 @@ def _peak(observer, target, samples: Time) -> _Peak | None:
 def _visible_body(
     body: CatalogBody, observer, target, peak: _Peak, magnitude: float | None
 ) -> VisibleBody:
+    """The body's Detail Layer fields, with rise and set taken around its peak."""
     return VisibleBody(
         id=body.id,
         category=body.category,

@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from app.comets import NAMED_COMETS, MpcElementsCache, named_comet_elements
+from app.comets import (
+    NAMED_COMETS,
+    PINNED_ELEMENTS_ENV,
+    MpcElementsCache,
+    named_comet_elements,
+)
 
 NOW = datetime(2026, 11, 9, 12, tzinfo=UTC)
 NAMED_DESIGNATIONS = {comet.designation for comet in NAMED_COMETS}
@@ -132,6 +137,17 @@ def test_unreadable_elements_yield_no_comets(tmp_path: Path):
 def test_pinned_elements_file_that_is_missing_yields_no_comets(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setenv("STARCAST_COMET_ELEMENTS", str(tmp_path / "nowhere.txt"))
+    monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(tmp_path / "nowhere.txt"))
 
     assert named_comet_elements(tmp_path) == {}
+
+
+def test_elements_that_cannot_be_written_to_the_cache_yield_no_comets(
+    tmp_path: Path, elements: bytes
+):
+    # The cache's parent is a file, so its directory cannot be created: a read-only data dir.
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_bytes(b"")
+    cache = MpcElementsCache(blocker / "AllCometEls.txt", fetch=FakeFetch(elements))
+
+    assert cache.named_comet_elements() == {}
