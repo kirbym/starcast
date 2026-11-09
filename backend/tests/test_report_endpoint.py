@@ -22,8 +22,9 @@ QUIET_NIGHT_REQUEST = {
     "date": "2026-06-21",
     "location_label": None,
 }
-# New York on 2026-11-05: Jupiter is the Category 1 Highlight and Andromeda, passing almost
-# overhead, the Category 2 Highlight, among other Visible bodies.
+# New York on 2026-11-05: Jupiter is the Category 1 Highlight, Andromeda, passing almost
+# overhead, the Category 2 Highlight, and Sirius, rising before dawn, the Category 3 Highlight,
+# among other Visible bodies.
 JUPITER_NIGHT_REQUEST = {**VALID_REQUEST, "date": "2026-11-05"}
 
 
@@ -168,7 +169,7 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     assert response.status_code == 200
-    [highlight, _constellation] = response.json()["highlights"]
+    [highlight, _constellation, _star] = response.json()["highlights"]
     assert set(highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert highlight["id"] == "planet:jupiter"
     assert highlight["category"] == "planet_moon"
@@ -180,11 +181,11 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", highlight["rises_at"])
 
 
-def test_constellation_highlight_is_narrated_alongside_the_planet(client: TestClient):
+def test_one_highlight_card_per_category_is_narrated_in_category_order(client: TestClient):
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     assert response.status_code == 200
-    [planet, constellation] = response.json()["highlights"]
+    [planet, constellation, star] = response.json()["highlights"]
     assert planet["id"] == "planet:jupiter"
     assert constellation["id"] == "constellation:and"
     assert constellation["category"] == "constellation"
@@ -193,12 +194,21 @@ def test_constellation_highlight_is_narrated_alongside_the_planet(client: TestCl
     assert constellation["magnitude"] is None
     assert constellation["mini_headline"] == "Andromeda takes the stage"
     assert constellation["paragraph"] == "A story about Andromeda."
+    assert set(star) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
+    assert star["id"] == "bright_star:sirius"
+    assert star["category"] == "featured"
+    assert star["object_type"] == "bright_star"
+    assert star["name"] == "Sirius"
+    assert star["magnitude"] == pytest.approx(-1.44)
+    assert star["mini_headline"] == "Sirius takes the stage"
+    assert star["paragraph"] == "A story about Sirius."
 
 
 def test_highlight_cards_are_merged_by_id_whatever_order_the_narrator_returns_them_in(
     client: TestClient, narrator: FakeNarrator
 ):
     narrator.cards = [
+        NarrationCard(id="bright_star:sirius", mini_headline="The Dog Star", paragraph="S."),
         NarrationCard(id="constellation:and", mini_headline="The chained princess", paragraph="A."),
         NarrationCard(id="planet:jupiter", mini_headline="The king rises", paragraph="J."),
     ]
@@ -206,13 +216,14 @@ def test_highlight_cards_are_merged_by_id_whatever_order_the_narrator_returns_th
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     assert response.status_code == 200
-    mini_headlines = {
-        highlight["id"]: highlight["mini_headline"] for highlight in response.json()["highlights"]
-    }
-    assert mini_headlines == {
-        "planet:jupiter": "The king rises",
-        "constellation:and": "The chained princess",
-    }
+    mini_headlines = [
+        (highlight["id"], highlight["mini_headline"]) for highlight in response.json()["highlights"]
+    ]
+    assert mini_headlines == [
+        ("planet:jupiter", "The king rises"),
+        ("constellation:and", "The chained princess"),
+        ("bright_star:sirius", "The Dog Star"),
+    ]
 
 
 def test_narrator_receives_raw_fields_of_each_highlight(client: TestClient, narrator: FakeNarrator):
@@ -221,10 +232,27 @@ def test_narrator_receives_raw_fields_of_each_highlight(client: TestClient, narr
     assert [received["id"] for received in narrator.received] == [
         "planet:jupiter",
         "constellation:and",
+        "bright_star:sirius",
     ]
     for received in narrator.received:
-        assert set(received) == POSITIONAL_FIELDS
+        assert set(received) == POSITIONAL_FIELDS | {"context"}
         assert isinstance(received["rises_at"], str)
+
+
+def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
+    client: TestClient, narrator: FakeNarrator
+):
+    client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    planet, constellation, star = narrator.received
+    assert planet["context"] is None
+    assert constellation["context"] is None
+    context = star["context"]
+    assert context["bayer_designation"] == "α CMa"
+    assert context["constellation"] == "Canis Major"
+    assert context["spectral_type"].startswith("A0")
+    assert context["color_index_b_v"] == pytest.approx(0.0, abs=0.05)
+    assert 8 < context["distance_light_years"] < 9
 
 
 def test_every_visible_body_is_listed_with_highlights_included(client: TestClient):
@@ -234,12 +262,22 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
     ids = {body["id"] for body in visible}
     assert {"planet:jupiter", "planet:mars", "planet:saturn", "moon:moon"} <= ids
     assert {"constellation:and", "constellation:ori", "constellation:uma"} <= ids
+    assert {"bright_star:sirius", "bright_star:capella", "bright_star:polaris"} <= ids
     assert "planet:venus" not in ids
     assert "constellation:cru" not in ids
+    assert "bright_star:canopus" not in ids
+    categories = {
+        "planet": "planet_moon",
+        "moon": "planet_moon",
+        "constellation": "constellation",
+        "bright_star": "featured",
+    }
     for body in visible:
         assert set(body) == POSITIONAL_FIELDS
-        expected = "constellation" if body["object_type"] == "constellation" else "planet_moon"
-        assert body["category"] == expected
+        assert body["category"] == categories[body["object_type"]]
+    sirius = next(body for body in visible if body["id"] == "bright_star:sirius")
+    assert sirius["magnitude"] == pytest.approx(-1.44)
+    assert sirius["peak_altitude_degrees"] > 0
 
 
 @pytest.mark.parametrize(

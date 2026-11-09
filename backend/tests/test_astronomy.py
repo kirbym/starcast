@@ -1,8 +1,9 @@
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from app.astronomy import compute_night_sky
+from app.astronomy import CATALOG, Catalog, compute_night_sky
 
 # Published values: USNO "Astronomical Twilight for 2026" tables, retrieved 2026-11-04 from
 # https://aa.usno.navy.mil/calculated/rstt/year (task=4). The tables print whole minutes in
@@ -290,7 +291,121 @@ def test_category_2_is_the_visible_constellation_with_the_highest_peak_altitude(
     assert category_2_highlight(sky) == highest
 
 
-def test_category_1_and_category_2_highlights_appear_together_in_category_order():
+def bright_stars(sky) -> list:
+    return [body for body in sky.visible_objects if body.object_type == "bright_star"]
+
+
+def test_bright_stars_are_in_catalog_with_their_v_magnitudes():
+    # As with the constellations, the two polar nights between them show the whole sky.
+    north = compute_night_sky(90.0, 0.0, "Etc/UTC", date(2026, 12, 21))
+    south = compute_night_sky(-90.0, 0.0, "Etc/UTC", date(2026, 6, 21))
+    seen = {body.id: body for body in bright_stars(north) + bright_stars(south)}
+
+    # Every IAU-named star at V <= 2.50: about 90 of them.
+    assert 85 <= len(seen) <= 95
+    for body in seen.values():
+        assert body.id.startswith("bright_star:")
+        assert body.category == "featured"
+        assert body.name
+        assert body.magnitude is not None and body.magnitude <= 2.50
+    assert -1.5 < seen["bright_star:sirius"].magnitude < -1.4
+    assert seen["bright_star:sirius"].name == "Sirius"
+    assert seen["bright_star:rigil_kentaurus"].name == "Rigil Kentaurus"
+    # Names the WGSN approved after HYG v4.1 was published.
+    assert seen["bright_star:tiansi"].name == "Tiansi"
+    assert seen["bright_star:uridim"].name == "Uridim"
+    # ε Boo A is Izar; its fainter companion, Pulcherrima, shares its HIP number.
+    assert seen["bright_star:izar"].name == "Izar"
+    assert "bright_star:pulcherrima" not in seen
+
+
+def test_visible_bright_star_carries_its_positional_fields():
+    # Early November from New York: Sirius rises around midnight and is climbing toward the
+    # meridian at dawn. At declination -16.7 it can reach at most 32.6 degrees here.
     sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
 
+    sirius = visible_body(sky, "bright_star:sirius")
+    assert sirius.object_type == "bright_star"
+    assert sirius.category == "featured"
+    assert 20 < sirius.peak_altitude_degrees < 33
+    assert 90 < sirius.azimuth_at_peak_degrees < 270
+    assert sirius.magnitude == pytest.approx(-1.44)
+    window = sky.viewing_window
+    assert sirius.rises_at is not None and window.starts_at < sirius.rises_at < window.ends_at
+    assert sirius.sets_at is not None and sirius.sets_at > window.ends_at
+
+
+def test_bright_star_that_never_rises_is_absent():
+    # Canopus sits at declination -52.7, so from New York (40.7 N) it never clears the horizon.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+
+    assert "bright_star:canopus" not in visible_ids(sky)
+
+
+def category_3_highlight(sky):
+    return highlight_in(sky, "featured")
+
+
+def test_brightest_visible_star_is_the_category_3_highlight_even_when_lower_than_others():
+    # 2026-11-05 from New York: Sirius, the brightest star in the sky, rises before dawn, while
+    # Capella passes almost overhead.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+    sirius, capella = (visible_body(sky, f"bright_star:{key}") for key in ("sirius", "capella"))
+    assert capella.peak_altitude_degrees > sirius.peak_altitude_degrees
+
+    assert category_3_highlight(sky).id == "bright_star:sirius"
+
+
+@pytest.mark.parametrize(
+    ("location", "timezone", "night"),
+    [
+        pytest.param(NEW_YORK, "America/New_York", date(2026, 6, 21), id="new-york-summer"),
+        pytest.param(SYDNEY, "Australia/Sydney", date(2026, 6, 21), id="sydney-winter"),
+        pytest.param(TROMSO, "Europe/Oslo", date(2026, 12, 22), id="tromso-polar-night"),
+    ],
+)
+def test_category_3_is_the_brightest_visible_bright_star(location, timezone, night):
+    sky = compute_night_sky(*location, timezone, night)
+
+    brightest = min(bright_stars(sky), key=lambda body: body.magnitude)
+    assert category_3_highlight(sky) == brightest
+
+
+def only_bright_stars(*keys: str) -> Catalog:
+    """The real catalog, with Category 3 narrowed to the named Bright Stars, in that order."""
+    stars = {body.key: body for body in CATALOG.featured}
+    return replace(CATALOG, featured=tuple(stars[key] for key in keys))
+
+
+@pytest.mark.parametrize("keys", [("deneb", "mimosa"), ("mimosa", "deneb")])
+def test_peak_altitude_breaks_a_magnitude_tie_in_category_3(keys):
+    # Deneb and Mimosa share V = 1.25. No real night leaves two equally bright stars as the
+    # brightest Visible ones: Polaris, Capella or Canopus is always Visible to outshine a tied pair.
+    # So this narrows Category 3 to the pair. From Sydney in June, Mimosa (in the Southern Cross)
+    # stands high in the south while Deneb only skims the northern horizon before dawn.
+    sky = compute_night_sky(
+        *SYDNEY, "Australia/Sydney", date(2026, 6, 21), only_bright_stars(*keys)
+    )
+    deneb, mimosa = (visible_body(sky, f"bright_star:{key}") for key in ("deneb", "mimosa"))
+    assert deneb.magnitude == mimosa.magnitude
+    assert mimosa.peak_altitude_degrees > deneb.peak_altitude_degrees
+
+    assert category_3_highlight(sky).id == "bright_star:mimosa"
+
+
+def test_category_3_is_omitted_when_no_candidate_is_visible():
+    # Mimosa (declination -59.7) never rises from Tromso, though planets and constellations do.
+    sky = compute_night_sky(*TROMSO, "Europe/Oslo", date(2026, 12, 22), only_bright_stars("mimosa"))
+
+    assert bright_stars(sky) == []
     assert [body.category for body in sky.highlights] == ["planet_moon", "constellation"]
+
+
+def test_highlights_from_all_three_categories_appear_together_in_category_order():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+
+    assert [body.category for body in sky.highlights] == [
+        "planet_moon",
+        "constellation",
+        "featured",
+    ]

@@ -56,7 +56,12 @@ def create_report(
         report_request.date,
     )
     highlights = [SkyObject.model_validate(body) for body in sky.highlights]
-    narration = narrator.narrate([highlight.model_dump(mode="json") for highlight in highlights])
+    narration = narrator.narrate(
+        [
+            {**highlight.model_dump(mode="json"), "context": body.context}
+            for highlight, body in zip(highlights, sky.highlights, strict=True)
+        ]
+    )
     return ReportResponse(
         headline=narration.headline,
         viewing_window=sky.viewing_window,
