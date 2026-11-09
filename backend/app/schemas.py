@@ -2,12 +2,12 @@
 
 import datetime as dt
 import re
-from typing import Annotated, Any
+from typing import Annotated
 from zoneinfo import available_timezones
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
-from app.astronomy import ViewingWindow
+from app.astronomy import Category, ObjectType, ViewingWindow
 
 # Whole years inside DE440s's coverage (December 1849 to January 2150).
 _EARLIEST_YEAR = 1850
@@ -38,8 +38,30 @@ class ReportRequest(BaseModel):
     location_label: str | None = None
 
 
+class SkyObject(BaseModel):
+    """A Visible body's raw fields: one entry of visible_objects, and what the Narrator is given."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    category: Category
+    object_type: ObjectType
+    name: str
+    peak_altitude_degrees: float
+    azimuth_at_peak_degrees: float
+    rises_at: dt.datetime | None
+    sets_at: dt.datetime | None
+    magnitude: float | None
+    event: None
+
+
+class Highlight(SkyObject):
+    mini_headline: str
+    paragraph: str
+
+
 class ReportResponse(BaseModel):
     headline: str
     viewing_window: ViewingWindow
-    highlights: list[dict[str, Any]]
-    visible_objects: list[dict[str, Any]]
+    highlights: list[Highlight]
+    visible_objects: list[SkyObject]

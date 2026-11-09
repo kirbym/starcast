@@ -42,7 +42,7 @@ _Avoid_: "special event", "astronomical event", "rare event"
 
 **Visual Priority**:
 The ranking used to select one Highlight from multiple Visible candidates within the same Category. Ties in every Category are broken by Peak Altitude.
-- **Category 1**: outer gas giants rank above inner rocky planets. The Moon is a wildcard: when it is Visible and at least 50% illuminated, it ranks above every Planet; otherwise it ranks below every Planet.
+- **Category 1**: the gas giants (Jupiter, Saturn) rank above the inner rocky planets, which rank above the faint ice giants (Uranus, Neptune). The Moon is a wildcard: when it is Visible and at least 50% illuminated, it ranks above every Planet; otherwise it ranks below every Planet.
 - **Category 2**: the Named Constellation with the highest Peak Altitude.
 - **Category 3**: a Significant Event always wins. Otherwise Bright Stars, Named Comets and DSOs compete together, ranked by brightness (lowest magnitude first), then Peak Altitude.
 _Avoid_: "importance", "ranking score", "priority score"

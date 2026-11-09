@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.astronomy import compute_night_sky
-from app.narrator import Narrator, get_narrator
-from app.schemas import ReportRequest, ReportResponse
+from app.narrator import Narration, NarrationError, Narrator, get_narrator
+from app.schemas import Highlight, ReportRequest, ReportResponse, SkyObject
 
 app = FastAPI(title="StarCast API")
 app.add_middleware(
@@ -31,6 +31,14 @@ def invalid_location(_request: Request, exc: RequestValidationError) -> JSONResp
     )
 
 
+@app.exception_handler(NarrationError)
+def narration_failed(_request: Request, exc: NarrationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=502,
+        content={"error": {"statusCode": 502, "type": "narration_failed", "message": str(exc)}},
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -47,10 +55,33 @@ def create_report(
         report_request.timezone,
         report_request.date,
     )
-    narration = narrator.narrate(sky.highlights)
+    highlights = [SkyObject.model_validate(body) for body in sky.highlights]
+    narration = narrator.narrate([highlight.model_dump(mode="json") for highlight in highlights])
     return ReportResponse(
         headline=narration.headline,
         viewing_window=sky.viewing_window,
-        highlights=sky.highlights,
-        visible_objects=sky.visible_objects,
+        highlights=_merge_cards(highlights, narration),
+        visible_objects=[SkyObject.model_validate(body) for body in sky.visible_objects],
     )
+
+
+def _merge_cards(highlights: list[SkyObject], narration: Narration) -> list[Highlight]:
+    """Attach each card to the Highlight with its id, so prose never lands on the wrong body.
+
+    Every Highlight must get exactly one card, and every card must belong to a Highlight.
+    """
+    cards = {card.id: card for card in narration.cards}
+    highlight_ids = [highlight.id for highlight in highlights]
+    if len(narration.cards) != len(highlights) or set(cards) != set(highlight_ids):
+        raise NarrationError(
+            f"card ids {[card.id for card in narration.cards]} do not match Highlights "
+            f"{highlight_ids}"
+        )
+    return [
+        Highlight(
+            **highlight.model_dump(),
+            mini_headline=cards[highlight.id].mini_headline,
+            paragraph=cards[highlight.id].paragraph,
+        )
+        for highlight in highlights
+    ]
