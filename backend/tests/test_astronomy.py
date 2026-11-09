@@ -364,28 +364,30 @@ def test_brightest_visible_star_is_the_category_3_highlight_even_when_lower_than
         pytest.param(TROMSO, "Europe/Oslo", date(2026, 12, 22), id="tromso-polar-night"),
     ],
 )
-def test_category_3_is_the_brightest_visible_bright_star(location, timezone, night):
+def test_category_3_is_the_brightest_visible_standing_body(location, timezone, night):
     sky = compute_night_sky(*location, timezone, night)
 
-    brightest = min(bright_stars(sky), key=lambda body: body.magnitude)
+    featured = [body for body in sky.visible_objects if body.category == "featured"]
+    brightest = min(featured, key=lambda body: body.magnitude)
     assert category_3_highlight(sky) == brightest
 
 
-def only_bright_stars(*keys: str) -> Catalog:
-    """The real catalog, with Category 3 narrowed to the named Bright Stars, in that order."""
-    stars = {body.key: body for body in CATALOG.featured}
-    return replace(CATALOG, featured=tuple(stars[key] for key in keys))
+def only_featured(*ids: str) -> Catalog:
+    """The real catalog, with Category 3 narrowed to the given standing bodies, in that order."""
+    featured = {body.id: body for body in CATALOG.featured}
+    return replace(CATALOG, featured=tuple(featured[body_id] for body_id in ids))
 
 
-@pytest.mark.parametrize("keys", [("deneb", "mimosa"), ("mimosa", "deneb")])
-def test_peak_altitude_breaks_a_magnitude_tie_in_category_3(keys):
+@pytest.mark.parametrize(
+    "ids",
+    [("bright_star:deneb", "bright_star:mimosa"), ("bright_star:mimosa", "bright_star:deneb")],
+)
+def test_peak_altitude_breaks_a_magnitude_tie_in_category_3(ids):
     # Deneb and Mimosa share V = 1.25. No real night leaves two equally bright stars as the
     # brightest Visible ones: Polaris, Capella or Canopus is always Visible to outshine a tied pair.
     # So this narrows Category 3 to the pair. From Sydney in June, Mimosa (in the Southern Cross)
     # stands high in the south while Deneb only skims the northern horizon before dawn.
-    sky = compute_night_sky(
-        *SYDNEY, "Australia/Sydney", date(2026, 6, 21), only_bright_stars(*keys)
-    )
+    sky = compute_night_sky(*SYDNEY, "Australia/Sydney", date(2026, 6, 21), only_featured(*ids))
     deneb, mimosa = (visible_body(sky, f"bright_star:{key}") for key in ("deneb", "mimosa"))
     assert deneb.magnitude == mimosa.magnitude
     assert mimosa.peak_altitude_degrees > deneb.peak_altitude_degrees
@@ -395,10 +397,79 @@ def test_peak_altitude_breaks_a_magnitude_tie_in_category_3(keys):
 
 def test_category_3_is_omitted_when_no_candidate_is_visible():
     # Mimosa (declination -59.7) never rises from Tromso, though planets and constellations do.
-    sky = compute_night_sky(*TROMSO, "Europe/Oslo", date(2026, 12, 22), only_bright_stars("mimosa"))
+    sky = compute_night_sky(
+        *TROMSO, "Europe/Oslo", date(2026, 12, 22), only_featured("bright_star:mimosa")
+    )
 
     assert bright_stars(sky) == []
     assert [body.category for body in sky.highlights] == ["planet_moon", "constellation"]
+
+
+def dsos(sky) -> list:
+    return [body for body in sky.visible_objects if body.object_type == "dso"]
+
+
+def test_all_110_messier_dsos_are_in_catalog_with_magnitudes():
+    # As with the constellations, the two polar nights between them show the whole sky.
+    north = compute_night_sky(90.0, 0.0, "Etc/UTC", date(2026, 12, 21))
+    south = compute_night_sky(-90.0, 0.0, "Etc/UTC", date(2026, 6, 21))
+    seen = {body.id: body for body in dsos(north) + dsos(south)}
+
+    assert set(seen) == {f"dso:m{number}" for number in range(1, 111)}
+    for body in seen.values():
+        assert body.category == "featured"
+        assert body.name
+        assert body.magnitude is not None
+    assert seen["dso:m31"].name == "Andromeda Galaxy"
+    assert seen["dso:m45"].name == "Pleiades"
+    assert seen["dso:m40"].context["type"] == "double star"
+    # A DSO with no common name goes by its Messier number.
+    assert seen["dso:m92"].name == "M92"
+    # OpenNGC follows Messier's own retraction of M102; StarCast takes the Spindle Galaxy.
+    assert seen["dso:m102"].name == "Spindle Galaxy"
+    assert seen["dso:m102"].context["designation"] == "NGC 5866"
+    # OpenNGC has no magnitude for M22; the override table supplies SEDS's.
+    assert seen["dso:m22"].magnitude == pytest.approx(5.1)
+
+
+def test_visible_dso_carries_its_positional_fields_and_catalog_context():
+    # Early November from New York, the Andromeda Galaxy passes almost overhead in the evening.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+
+    andromeda = visible_body(sky, "dso:m31")
+    assert andromeda.object_type == "dso"
+    assert andromeda.category == "featured"
+    assert andromeda.name == "Andromeda Galaxy"
+    assert andromeda.peak_altitude_degrees > 80
+    assert andromeda.magnitude == pytest.approx(3.44)
+    assert andromeda.context == {
+        "messier": "M31",
+        "designation": "NGC 224",
+        "type": "galaxy",
+        "constellation": "Andromeda",
+        "size_arcminutes": pytest.approx(177.83),
+    }
+
+
+def test_dso_that_never_rises_is_absent():
+    # Ptolemy's Cluster (M7) sits at declination -34.8, so from Tromso (69.65 N) it never rises.
+    sky = compute_night_sky(*TROMSO, "Europe/Oslo", date(2026, 12, 22))
+
+    assert "dso:m7" not in visible_ids(sky)
+
+
+@pytest.mark.parametrize(
+    "ids", [("dso:m45", "bright_star:mirfak"), ("bright_star:mirfak", "dso:m45")]
+)
+def test_bright_dso_outranks_a_fainter_bright_star_in_category_3(ids):
+    # 2026-11-05 from New York: Mirfak (V 1.79) passes higher than the Pleiades (V 1.20), but the
+    # Category 3 ranking is the same for every standing body, and the brighter one wins.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5), only_featured(*ids))
+    pleiades, mirfak = (visible_body(sky, body_id) for body_id in ("dso:m45", "bright_star:mirfak"))
+    assert mirfak.peak_altitude_degrees > pleiades.peak_altitude_degrees
+    assert pleiades.magnitude < mirfak.magnitude
+
+    assert category_3_highlight(sky).id == "dso:m45"
 
 
 def test_highlights_from_all_three_categories_appear_together_in_category_order():
