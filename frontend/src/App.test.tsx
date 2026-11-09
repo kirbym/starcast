@@ -544,6 +544,71 @@ test('shows a planet and a constellation Highlight Card together, in Category or
   }
 })
 
+const SIRIUS = {
+  id: 'bright_star:sirius',
+  category: 'featured',
+  object_type: 'bright_star',
+  name: 'Sirius',
+  peak_altitude_degrees: 31.2,
+  azimuth_at_peak_degrees: 168.9,
+  rises_at: '2026-11-06T04:23:41Z',
+  sets_at: '2026-11-06T14:57:06Z',
+  magnitude: -1.44,
+  event: null,
+}
+
+test('shows up to three Highlight Cards, one per Category, in Category order', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'Sirius blazes up before dawn, with Jupiter riding high beside it.',
+        highlights: [
+          {
+            ...JUPITER,
+            mini_headline: 'The king climbs the east',
+            paragraph: 'Jupiter rises late and climbs high before dawn.',
+          },
+          {
+            ...ANDROMEDA,
+            mini_headline: 'The chained princess overhead',
+            paragraph: 'Andromeda sails straight overhead in the evening, chained to her rock.',
+          },
+          {
+            ...SIRIUS,
+            mini_headline: 'The Dog Star wakes',
+            paragraph: 'Sirius, the brightest star of all, flashes low in the south before dawn.',
+          },
+        ],
+        visible_objects: [JUPITER, ANDROMEDA, SIRIUS],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const star = await screen.findByRole('article', { name: 'The Dog Star wakes' })
+  expect(star).toHaveTextContent(
+    'Sirius, the brightest star of all, flashes low in the south before dawn.',
+  )
+  const headings = screen
+    .getAllByRole('article')
+    .map((card) => card.querySelector('h2')?.textContent)
+  expect(headings).toEqual([
+    'The king climbs the east',
+    'The chained princess overhead',
+    'The Dog Star wakes',
+  ])
+  for (const number of ['-1.44', '31.2', '168.9', '04:23', '14:57']) {
+    expect(document.body).not.toHaveTextContent(number)
+  }
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({

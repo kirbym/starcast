@@ -311,6 +311,20 @@ bright_named.to_json("bright_stars.json", orient="records", indent=2)
 
 ---
 
+## As built (#23, 2026-11-09)
+
+- **Script:** `backend/scripts/build_bright_stars.py`, run from `backend/` with `uv run scripts/build_bright_stars.py`. It needs only the standard library. It downloads its two pinned sources once, into the git-ignored `backend/.cache/catalog-sources/`.
+- **Output:** `backend/app/data/bright_stars.csv`, with the columns `key, name, bayer, constellation, ra_hours, dec_degrees, magnitude, spectral_type, color_index, distance_light_years, hip`. The file header carries the HYG CC BY-SA 4.0 attribution, and the file is shared under that licence.
+- **Positions and photometry:** HYG v4.1 (`hygdata_v41.csv`), pinned to commit `e4fd9c9`. RA is kept in hours, as HYG ships it. Distances are converted from parsecs to light-years at three significant figures.
+- **Names:** the IAU-CSN text file above was last updated on 2022-04-04, so it misses later WGSN approvals such as **Uridim** (α Lup, 2024) and **Tiansi** (γ Cas, 2025). Names are instead taken from `cyschneck/iau-star-names` (`iau_proper_stars.csv`, MIT), a mirror of the WGSN list, pinned to commit `8bb9c74`. Names are matched to HYG rows on Hipparcos number.
+- **Result: 88 Bright Stars.** That is fewer than the ~91 estimated above, for three reasons:
+  - **Muhlifain** (γ Cen), **Girtab** (κ Sco) and **Regor** (γ² Vel) are not WGSN-approved names, so those stars are left out along with ε Cen and η Cen.
+  - **Acrab** is V 2.56 in HYG, which is fainter than the cutoff.
+  - **Toliman** (α Cen B, V 1.35) is in, because HYG lists it apart from Rigil Kentaurus (α Cen A).
+- **Catalog key:** the IAU name in lower case, with diacritics dropped and spaces turned into underscores. Ids look like `bright_star:sirius` and `bright_star:kaus_australis`.
+- **Narration context:** the Bayer designation, constellation name, spectral type, B-V and distance go to the Narrator as `context`. They are not part of the API's positional fields.
+- **Category 3 ties:** no real night has two equally bright stars as its brightest Visible Bright Stars. A geometric sweep over latitude and Viewing Window found none, because Polaris, Capella or Canopus always outshines any tied pair (Deneb and Mimosa at 1.25, for example). The tie-break test therefore narrows the catalog to a tied pair through `compute_night_sky(..., catalog=...)`.
+
 ## Sources
 
 - [IAU Catalog of Star Names (IAU-CSN)](https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt) — Eric Mamajek / IAU WGSN, primary star name authority

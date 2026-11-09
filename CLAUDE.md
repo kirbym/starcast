@@ -33,6 +33,8 @@ uv run pytest tests/test_astronomy.py::test_name       # single test
 
 `app/data/constellations.csv` (the 88 constellation Centroids) is generated, not hand-edited. Regenerate it with `uv run scripts/build_constellation_centroids.py`, and see `docs/research/constellation-centroids.md`.
 
+`app/data/bright_stars.csv` (the Bright Stars, from HYG v4.1 under CC BY-SA 4.0) is generated too. Regenerate it with `uv run scripts/build_bright_stars.py`, which downloads its pinned sources to `.cache/catalog-sources`, and see `docs/research/bright-stars-catalog.md`.
+
 The first astronomy run downloads the DE440s ephemeris (~32 MB) to `backend/.cache/skyfield`, or to `STARCAST_DATA_DIR` if set.
 
 `tests/test_claude_narrator.py` has one opt-in test that calls the real Claude API. It is skipped unless `ANTHROPIC_API_KEY` is set.
