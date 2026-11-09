@@ -4,24 +4,193 @@
   line-height: 1.4;
   color: #e8e6f0;
   background: #0b0d1a;
+
+  --surface: rgb(255 255 255 / 0.04);
+  --surface-raised: #161a2e;
+  --border: rgb(255 255 255 / 0.1);
+  --muted: #a9a6bd;
+  --skeleton-base: rgb(255 255 255 / 0.06);
+  --skeleton-shine: rgb(255 255 255 / 0.16);
 }
 
 body {
   margin: 0;
 }
 
+header {
+  box-sizing: border-box;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 0;
+}
+
 main {
   box-sizing: border-box;
   max-width: 40rem;
-  min-height: 100svh;
   margin: 0 auto;
   padding: 2rem 1rem;
-  display: grid;
-  align-content: center;
 }
 
-h1 {
+/* Location control */
+
+.location-control {
+  position: relative;
+  display: inline-block;
+}
+
+.location-pill {
+  font: inherit;
+  color: inherit;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.location-pill:hover,
+.location-pill[aria-expanded='true'] {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.location-dropdown {
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-raised);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.5);
+}
+
+.place-search input {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: rgb(0 0 0 / 0.25);
+}
+
+.place-search-message {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+}
+
+.place-search-results {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.place-search-results button {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  cursor: pointer;
+}
+
+.place-search-results button:hover,
+.place-search-results button:focus-visible {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.set-location {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* Cosmic Report. The skeleton reuses these boxes, so they define the layout
+   for both the loading and the loaded state. */
+
+.report {
+  display: grid;
+  gap: 2rem;
+}
+
+h1,
+.headline {
   margin: 0;
   font-size: clamp(1.75rem, 5vw, 2.5rem);
   font-weight: 600;
+}
+
+.highlight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.highlight-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.mini-headline {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.highlight-paragraph {
+  margin: 0;
+}
+
+/* Skeleton. Each line is exactly one line box tall (the root line-height),
+   like the text it stands in for; only its middle is painted. The gradient is
+   fixed to the viewport, so a single diagonal shine sweeps across every line
+   at once, from bottom-left to top-right. */
+
+.skeleton-line {
+  display: block;
+  box-sizing: border-box;
+  height: 1.4em;
+  padding: 0.3em 0;
+  background-clip: content-box;
+  border-radius: 0.4em / 0.6em;
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    to top right,
+    transparent 40%,
+    var(--skeleton-shine) 50%,
+    transparent 60%
+  );
+  background-attachment: fixed;
+  background-size: 300% 300%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.skeleton-line-short {
+  width: 60%;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0%;
+  }
+  to {
+    background-position: 0% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+    background-image: none;
+  }
 }
