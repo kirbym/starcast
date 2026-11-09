@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { StrictMode } from 'react'
@@ -63,6 +63,12 @@ function saveLocation(location: {
 function savedLocation(): unknown {
   const raw = localStorage.getItem('starcast.location')
   return raw === null ? null : JSON.parse(raw)
+}
+
+function denyGeolocation() {
+  fakeGeolocation((_success, failure) =>
+    failure({ code: 1, message: 'denied' } as GeolocationPositionError),
+  )
 }
 
 function geolocateTo(latitude: number, longitude: number) {
@@ -266,21 +272,19 @@ test('changes location by searching from the header pill', async () => {
 })
 
 test('loads a report for a place chosen on the set-location screen', async () => {
-  fakeGeolocation((_success, failure) =>
-    failure({ code: 1, message: 'denied' } as GeolocationPositionError),
-  )
+  denyGeolocation()
   server.use(
     http.post(REPORT_URL, () => HttpResponse.json(QUIET_NIGHT)),
     http.get(`${NOMINATIM}/search`, () => HttpResponse.json([TOKYO_MATCH])),
   )
   renderApp()
-  const screenHeading = await screen.findByRole('heading', {
+  const setLocationScreen = await screen.findByRole('region', {
     name: 'Where are you stargazing tonight?',
   })
 
   searchFor('Tokyo')
   fireEvent.click(
-    await within(screenHeading.parentElement!).findByRole('button', {
+    await within(setLocationScreen).findByRole('button', {
       name: 'Tokyo, Japan',
     }),
   )
@@ -303,9 +307,7 @@ test.each([
 ])(
   'says so inline when place search %s, keeping the query and not retrying',
   async (_outcome, respond, message) => {
-    fakeGeolocation((_success, failure) =>
-      failure({ code: 1, message: 'denied' } as GeolocationPositionError),
-    )
+    denyGeolocation()
     let searches = 0
     server.use(
       http.get(`${NOMINATIM}/search`, () => {
@@ -381,4 +383,54 @@ test('closes the place search on Escape without changing location', async () => 
 
   expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   expect(pill).toHaveAttribute('aria-expanded', 'false')
+})
+
+test('keeps a place chosen while geolocation is still pending', async () => {
+  let answerGeolocation: () => void = () => {}
+  fakeGeolocation((success) => {
+    answerGeolocation = () =>
+      success({
+        coords: { latitude: 34.05, longitude: -118.24 },
+      } as GeolocationPosition)
+  })
+  const labels: unknown[] = []
+  server.use(
+    http.post(REPORT_URL, async ({ request }) => {
+      labels.push(((await request.json()) as { location_label: unknown }).location_label)
+      return HttpResponse.json(QUIET_NIGHT)
+    }),
+    http.get(`${NOMINATIM}/search`, () => HttpResponse.json([TOKYO_MATCH])),
+  )
+  renderApp()
+
+  fireEvent.click(await screen.findByRole('button', { name: '📍 Locating…' }))
+  searchFor('Tokyo')
+  fireEvent.click(await screen.findByRole('button', { name: 'Tokyo, Japan' }))
+  await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
+  await act(async () => {
+    answerGeolocation()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+
+  expect(screen.getByRole('button', { name: '📍 Tokyo ▾' })).toBeInTheDocument()
+  expect(labels).toEqual(['Tokyo'])
+  expect(savedLocation()).toMatchObject({ label: 'Tokyo' })
+})
+
+test('asks where you are stargazing when the location prompt goes unanswered', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout'] })
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    geolocation: { getCurrentPosition: () => {} },
+  })
+
+  renderApp()
+  await act(async () => {
+    vi.advanceTimersByTime(20_000)
+  })
+
+  expect(
+    screen.getByRole('heading', { name: 'Where are you stargazing tonight?' }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '📍 Set location' })).toBeInTheDocument()
 })

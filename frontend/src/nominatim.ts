@@ -8,12 +8,12 @@ import type { Location } from './location.ts'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org'
 const TIMEOUT_MS = 8000
 
-type Place = { name?: string; display_name: string }
+type NominatimPlace = { name?: string; display_name: string }
 
 /** A search result: the location to report on plus its full address. */
 export type PlaceMatch = Location & { label: string; description: string }
 
-async function nominatim(path: string, params: Record<string, string>) {
+async function fetchNominatim(path: string, params: Record<string, string>) {
   const url = `${NOMINATIM_URL}/${path}?${new URLSearchParams({ format: 'jsonv2', ...params })}`
   const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
   if (!response.ok) {
@@ -22,16 +22,14 @@ async function nominatim(path: string, params: Record<string, string>) {
   return response.json()
 }
 
-function shortName(place: Place): string {
+function shortName(place: NominatimPlace): string {
   return place.name || place.display_name.split(',')[0]
 }
 
 /** Places matching a free-text query, best match first. */
 export async function searchPlaces(query: string): Promise<PlaceMatch[]> {
-  const places: (Place & { lat: string; lon: string })[] = await nominatim(
-    'search',
-    { q: query, limit: '5' },
-  )
+  const places: (NominatimPlace & { lat: string; lon: string })[] =
+    await fetchNominatim('search', { q: query, limit: '5' })
   return places.map((place) => ({
     latitude: Number(place.lat),
     longitude: Number(place.lon),
@@ -46,11 +44,11 @@ export async function placeName(
   longitude: number,
 ): Promise<string | null> {
   try {
-    const place: Place | { error: string } = await nominatim('reverse', {
-      lat: String(latitude),
-      lon: String(longitude),
-      zoom: '10',
-    })
+    // Nominatim answers 200 with { error } when it has no place there.
+    const place: NominatimPlace | { error: string } = await fetchNominatim(
+      'reverse',
+      { lat: String(latitude), lon: String(longitude), zoom: '10' },
+    )
     return 'display_name' in place ? shortName(place) : null
   } catch (error) {
     console.error(error)

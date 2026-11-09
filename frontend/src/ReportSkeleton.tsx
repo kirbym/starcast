@@ -17,8 +17,8 @@ function ReportSkeleton() {
         <span className="skeleton-line skeleton-line-short" />
       </div>
       <ul className="highlight-list" aria-hidden="true">
-        {[0, 1, 2].map((card) => (
-          <li key={card} className="highlight-card">
+        {[0, 1, 2].map((slot) => (
+          <li key={slot} className="highlight-card">
             <div className="mini-headline">
               <span className="skeleton-line skeleton-line-short" />
             </div>
