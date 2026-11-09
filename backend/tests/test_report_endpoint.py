@@ -263,6 +263,7 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
     assert {"planet:jupiter", "planet:mars", "planet:saturn", "moon:moon"} <= ids
     assert {"constellation:and", "constellation:ori", "constellation:uma"} <= ids
     assert {"bright_star:sirius", "bright_star:capella", "bright_star:polaris"} <= ids
+    assert {"dso:m31", "dso:m45", "dso:m42"} <= ids
     assert "planet:venus" not in ids
     assert "constellation:cru" not in ids
     assert "bright_star:canopus" not in ids
@@ -271,6 +272,7 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
         "moon": "planet_moon",
         "constellation": "constellation",
         "bright_star": "featured",
+        "dso": "featured",
     }
     for body in visible:
         assert set(body) == POSITIONAL_FIELDS

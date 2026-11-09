@@ -38,6 +38,13 @@ travelled, in words, never as numbers. Take the colour from B-V: below 0 is blue
 is Sun-like yellow, and above 1 is orange to red. A spectral type joined with "+" describes a
 double star whose combined light you see as one point.
 
+For a DSO (object_type "dso", a Messier object) context gives the Messier number, the NGC, IC or
+other catalog designation when it has one, the kind of object (such as a galaxy, a globular
+cluster or a planetary nebula), the constellation it lies in and its apparent size in arcminutes.
+The full Moon spans about 30 arcminutes, so compare the size with it, in words. A DSO fainter
+than about magnitude 6 needs dark skies and binoculars or a small telescope; say so plainly rather
+than promising a naked-eye view.
+
 Write one headline and one card per Highlight.
 
 Voice: conversational, with the occasional poetic flourish, always grounded in real astronomy.
