@@ -45,6 +45,13 @@ The full Moon spans about 30 arcminutes, so compare the size with it, in words. 
 than about magnitude 6 needs dark skies and binoculars or a small telescope; say so plainly rather
 than promising a naked-eye view.
 
+For a Named Comet (object_type "comet") context gives its designation and the date of the
+perihelion passage, its closest swing past the Sun. Compare that date with the night's rises_at or
+sets_at to tell whether the comet is heading in toward the Sun or already outbound, in words. A
+comet is a rare visitor rather than a fixture of the sky, so say what makes this one special
+tonight. Its brightness is a prediction: comets can surprise either way, and its glow is spread
+out, so it looks fainter than a star of the same magnitude.
+
 Write one headline and one card per Highlight.
 
 Voice: conversational, with the occasional poetic flourish, always grounded in real astronomy.
