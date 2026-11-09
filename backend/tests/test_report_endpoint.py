@@ -23,7 +23,7 @@ QUIET_NIGHT_REQUEST = {
     "location_label": None,
 }
 # New York on 2026-11-05: Jupiter is the Category 1 Highlight, Andromeda, passing almost
-# overhead, the Category 2 Highlight, and Sirius, up before dawn, the Category 3 Highlight,
+# overhead, the Category 2 Highlight, and Sirius, rising before dawn, the Category 3 Highlight,
 # among other Visible bodies.
 JUPITER_NIGHT_REQUEST = {**VALID_REQUEST, "date": "2026-11-05"}
 

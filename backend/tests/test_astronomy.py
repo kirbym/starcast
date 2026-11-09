@@ -314,6 +314,9 @@ def test_bright_stars_are_in_catalog_with_their_v_magnitudes():
     # Names the WGSN approved after HYG v4.1 was published.
     assert seen["bright_star:tiansi"].name == "Tiansi"
     assert seen["bright_star:uridim"].name == "Uridim"
+    # ε Boo A is Izar; its fainter companion, Pulcherrima, shares its HIP number.
+    assert seen["bright_star:izar"].name == "Izar"
+    assert "bright_star:pulcherrima" not in seen
 
 
 def test_visible_bright_star_carries_its_positional_fields():
@@ -344,7 +347,7 @@ def category_3_highlight(sky):
 
 
 def test_brightest_visible_star_is_the_category_3_highlight_even_when_lower_than_others():
-    # 2026-11-05 from New York: Sirius, the brightest star in the sky, is up before dawn, while
+    # 2026-11-05 from New York: Sirius, the brightest star in the sky, rises before dawn, while
     # Capella passes almost overhead.
     sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
     sirius, capella = (visible_body(sky, f"bright_star:{key}") for key in ("sirius", "capella"))
@@ -377,7 +380,7 @@ def only_bright_stars(*keys: str) -> Catalog:
 @pytest.mark.parametrize("keys", [("deneb", "mimosa"), ("mimosa", "deneb")])
 def test_peak_altitude_breaks_a_magnitude_tie_in_category_3(keys):
     # Deneb and Mimosa share V = 1.25. No real night leaves two equally bright stars as the
-    # brightest Visible ones: Polaris, Capella or Canopus is always up to outshine a tied pair.
+    # brightest Visible ones: Polaris, Capella or Canopus is always Visible to outshine a tied pair.
     # So this narrows Category 3 to the pair. From Sydney in June, Mimosa (in the Southern Cross)
     # stands high in the south while Deneb only skims the northern horizon before dawn.
     sky = compute_night_sky(

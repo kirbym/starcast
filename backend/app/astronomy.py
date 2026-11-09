@@ -60,6 +60,11 @@ class CatalogBody:
     def category(self) -> Category:
         return _CATEGORIES[self.object_type]
 
+    @property
+    def is_fixed(self) -> bool:
+        """Whether the body sits at a fixed J2000 point rather than moving through the ephemeris."""
+        return isinstance(self.target, Star)
+
 
 @dataclass(frozen=True)
 class Catalog:
@@ -296,7 +301,7 @@ def _sample_times(window: ViewingWindow) -> Time:
 
 def _observe(body: CatalogBody, observer, samples: Time) -> _Observation | None:
     """Position one body over the night, or None if it never clears the horizon."""
-    target = _ephemeris()[body.target] if isinstance(body.target, str) else body.target
+    target = body.target if body.is_fixed else _ephemeris()[body.target]
     altitudes, azimuths, _ = observer.at(samples).observe(target).apparent().altaz()
     peak = int(altitudes.degrees.argmax())
     if altitudes.degrees[peak] <= 0:
@@ -340,7 +345,7 @@ def _magnitude(body: CatalogBody, observer, target, moment: Time) -> float | Non
 
     A fixed body's magnitude comes from the catalog; a moving body's is computed for the moment.
     """
-    if not isinstance(body.target, str):
+    if body.is_fixed:
         return body.magnitude
     if body.object_type == "moon":
         return _moon_magnitude(observer, target, moment)

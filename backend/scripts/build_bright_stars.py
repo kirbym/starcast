@@ -59,14 +59,48 @@ def download(url: str, name: str) -> Path:
     return path
 
 
+# HYG spectral types that contradict the star's own B-V colour, because HYG carries a
+# companion's or a stale classification. Keyed by HIP, with the primary's type from SIMBAD.
+SPECTRAL_TYPE_FIXES = {
+    24608: "K0III+G1III",  # Capella: HYG has "M1: comp"; the pair are G/K giants (B-V 0.80).
+    54061: "K0III",  # Dubhe: HYG has its F7V companion's type (B-V 1.06).
+    9640: "K3IIb",  # Almach: HYG has gamma2 And's B8V (B-V 1.37).
+    72105: "K0II-III+A2V",  # Izar: HYG has "A0" (B-V 0.97).
+}
+# The B-V range each spectral class may plausibly show, generous enough for reddened giants.
+COLOR_INDEX_BY_CLASS = {
+    "O": (-0.5, -0.1), "B": (-0.45, 0.15), "A": (-0.15, 0.45), "F": (0.15, 0.75),
+    "G": (0.4, 1.15), "K": (0.7, 1.8), "M": (1.2, 2.3),
+}  # fmt: skip
+
+
 def iau_names_by_hip(path: Path) -> dict[int, str]:
-    """Hipparcos number -> IAU-approved proper name, for every named star with a HIP number."""
+    """Hipparcos number -> IAU-approved proper name, for every named star with a HIP number.
+
+    A HIP number can cover a double star whose components the WGSN names apart, such as Izar and
+    Pulcherrima (ε Boo and ε Boo B). HYG's magnitude is the primary's, so its name wins: the one
+    whose Bayer ID names no secondary component.
+    """
+    by_hip: dict[int, str] = {}
     with path.open(encoding="utf-8", newline="") as file:
-        return {
-            int(row["HIP"]): row["Proper Names"].strip()
-            for row in csv.DictReader(file)
-            if row["HIP"].strip().isdigit()
-        }
+        for row in csv.DictReader(file):
+            if not row["HIP"].strip().isdigit():
+                continue
+            hip = int(row["HIP"])
+            secondary = row["Bayer ID"].split()[-1:] in (["B"], ["C"], ["D"])
+            if hip not in by_hip or not secondary:
+                by_hip[hip] = row["Proper Names"].strip()
+    return by_hip
+
+
+def spectral_type(star: dict[str, str]) -> str:
+    """HYG's spectral type, corrected where it contradicts the star's B-V colour."""
+    spectral = SPECTRAL_TYPE_FIXES.get(int(star["hip"]), star["spect"])
+    if star["ci"] and spectral[:1] in COLOR_INDEX_BY_CLASS:
+        low, high = COLOR_INDEX_BY_CLASS[spectral[0]]
+        if not low <= float(star["ci"]) <= high:
+            sys.exit(f"HIP {star['hip']}: type {spectral} contradicts B-V {star['ci']}")
+    return spectral
 
 
 def constellation_names() -> dict[str, str]:
@@ -87,13 +121,11 @@ def three_significant_figures(value: float) -> str:
 
 
 def bayer_designation(row: dict[str, str]) -> str:
-    """HYG's `Alp`/`Kap-1` and Flamsteed fields as a conventional designation, like `α CMa`."""
-    if row["bayer"]:
-        letter, _, index = row["bayer"].partition("-")
-        return f"{GREEK[letter]}{index} {row['con']}"
-    if row["flam"]:
-        return f"{row['flam']} {row['con']}"
-    return ""
+    """HYG's `Alp`/`Kap-1` Bayer field as a conventional designation, like `α CMa`."""
+    if not row["bayer"]:
+        sys.exit(f"HIP {row['hip']} has no Bayer designation")
+    letter, _, index = row["bayer"].partition("-")
+    return f"{GREEK[letter]}{index} {row['con']}"
 
 
 def main() -> None:
@@ -123,7 +155,7 @@ def main() -> None:
                     "ra_hours": f"{float(star['ra']):.6f}",
                     "dec_degrees": f"{float(star['dec']):.5f}",
                     "magnitude": f"{float(star['mag']):.2f}",
-                    "spectral_type": star["spect"],
+                    "spectral_type": spectral_type(star),
                     "color_index": f"{float(star['ci']):.3f}" if star["ci"] else "",
                     "distance_light_years": (
                         three_significant_figures(parsecs * PARSECS_TO_LIGHT_YEARS)

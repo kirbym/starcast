@@ -31,11 +31,12 @@ The user message is a JSON array of 0 to 3 Highlights, the bodies or events chos
 Each has raw fields: id, category, object_type, name, peak_altitude_degrees,
 azimuth_at_peak_degrees, rises_at, sets_at, magnitude, event and context.
 
-context is null or an object of catalog facts about the body. For a bright star it gives the
+context is null or an object of catalog facts about the body. For a Bright Star it gives the
 Bayer designation, the constellation, the spectral type, the B-V colour index and the distance in
 light-years. Use them to describe the star's colour and character and how far its light has
-travelled, in words, never as numbers: a B-V below 0 is blue-white, near 0.6 is Sun-like yellow,
-and above 1 is orange to red.
+travelled, in words, never as numbers. Take the colour from B-V: below 0 is blue-white, near 0.6
+is Sun-like yellow, and above 1 is orange to red. A spectral type joined with "+" describes a
+double star whose combined light you see as one point.
 
 Write one headline and one card per Highlight.
 

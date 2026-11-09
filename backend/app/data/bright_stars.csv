@@ -10,7 +10,7 @@ canopus,Canopus,α Car,Carina,6.399195,-52.69566,-0.62,F0Ib,0.164,309,30438
 arcturus,Arcturus,α Boo,Boötes,14.261030,19.18241,-0.05,K2IIIp,1.239,36.7,69673
 rigil_kentaurus,Rigil Kentaurus,α1 Cen,Centaurus,14.660765,-60.83398,-0.01,G2V,0.710,4.32,71683
 vega,Vega,α Lyr,Lyra,18.615640,38.78369,0.03,A0Vvar,-0.001,25,91262
-capella,Capella,α Aur,Auriga,5.278150,45.99799,0.08,M1: comp,0.795,42.8,24608
+capella,Capella,α Aur,Auriga,5.278150,45.99799,0.08,K0III+G1III,0.795,42.8,24608
 rigel,Rigel,β Ori,Orion,5.242298,-8.20164,0.18,B8Ia,-0.030,863,24436
 procyon,Procyon,α CMi,Canis Minor,7.655033,5.22499,0.40,F5IV-V,0.432,11.5,37279
 achernar,Achernar,α Eri,Eridanus,1.628556,-57.23676,0.45,B3Vp,-0.158,139,7588
@@ -40,7 +40,7 @@ alnitak,Alnitak,ζ Ori,Orion,5.679313,-1.94257,1.74,O9.5Ib SB,-0.199,736,26727
 alioth,Alioth,ε UMa,Ursa Major,12.900472,55.95982,1.76,A0p,-0.022,82.6,62956
 kaus_australis,Kaus Australis,ε Sgr,Sagittarius,18.402868,-34.38462,1.79,B9.5III,-0.031,143,90185
 mirfak,Mirfak,α Per,Perseus,3.405378,49.86118,1.79,F5Ib,0.481,506,15863
-dubhe,Dubhe,α UMa,Ursa Major,11.062155,61.75103,1.81,F7V comp,1.061,123,54061
+dubhe,Dubhe,α UMa,Ursa Major,11.062155,61.75103,1.81,K0III,1.061,123,54061
 wezen,Wezen,δ CMa,Canis Major,7.139857,-26.39320,1.83,F8Ia,0.671,1610,34444
 alkaid,Alkaid,η UMa,Ursa Major,13.792354,49.31327,1.85,B3V SB,-0.099,104,67301
 avior,Avior,ε Car,Carina,8.375236,-59.50948,1.86,K3III+B2V,1.196,605,41037
@@ -65,7 +65,7 @@ saiph,Saiph,κ Ori,Orion,5.795941,-9.66961,2.07,B0.5Iavar,-0.168,647,27366
 tiaki,Tiaki,β Gru,Grus,22.711115,-46.88458,2.07,M5III,1.610,177,112122
 rasalhague,Rasalhague,α Oph,Ophiuchus,17.582241,12.56003,2.08,A5III,0.155,48.6,86032
 algol,Algol,β Per,Perseus,3.136148,40.95565,2.09,B8V,-0.003,89.9,14576
-almach,Almach,γ1 And,Andromeda,2.064984,42.32973,2.10,B8V,1.370,393,9640
+almach,Almach,γ1 And,Andromeda,2.064984,42.32973,2.10,K3IIb,1.370,393,9640
 denebola,Denebola,β Leo,Leo,11.817663,14.57206,2.14,A3Vvar,0.090,35.9,57632
 tiansi,Tiansi,γ Cas,Cassiopeia,0.945143,60.71674,2.15,B0IV:evar,-0.046,549,4427
 aspidiske,Aspidiske,ι Car,Carina,9.284838,-59.27523,2.21,A8Ib,0.189,766,45556
@@ -82,7 +82,7 @@ dschubba,Dschubba,δ Sco,Scorpius,16.005557,-22.62171,2.29,B0.2IV,-0.117,491,784
 larawag,Larawag,ε Sco,Scorpius,16.836080,-34.29323,2.29,K2IIIb,1.144,63.7,82396
 uridim,Uridim,α Lup,Lupus,14.698823,-47.38820,2.30,B1.5III,-0.154,465,71860
 merak,Merak,β UMa,Ursa Major,11.030677,56.38243,2.34,A1V,0.033,79.7,53910
-pulcherrima,Pulcherrima,ε Boo,Boötes,14.749784,27.07422,2.35,A0,0.966,203,72105
+izar,Izar,ε Boo,Boötes,14.749784,27.07422,2.35,K0II-III+A2V,0.966,203,72105
 enif,Enif,ε Peg,Pegasus,21.736433,9.87501,2.38,K2Ibvar,1.520,690,107315
 ankaa,Ankaa,α Phe,Phoenix,0.438056,-42.30598,2.40,K0III...,1.083,84.7,2081
 phecda,Phecda,γ UMa,Ursa Major,11.897168,53.69476,2.41,A0V SB,0.044,83.2,58001
