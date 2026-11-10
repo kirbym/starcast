@@ -4,7 +4,7 @@ import { loadSavedLocation, saveLocation, type Location } from './location.ts'
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
 import PlaceSearch from './PlaceSearch.tsx'
-import { fetchReport, type CosmicReport } from './report.ts'
+import { fetchReport, type CosmicReport, type SkyObject } from './report.ts'
 import ReportSkeleton from './ReportSkeleton.tsx'
 import { VisibleObjects } from './VisibleObjects.tsx'
 
@@ -114,7 +114,7 @@ function App() {
                 <HighlightList highlights={report.report.highlights} />
                 <VisibleObjects
                   viewingWindow={report.report.viewing_window}
-                  objects={report.report.visible_objects}
+                  objects={notHighlighted(report.report)}
                 />
               </>
             )}
@@ -126,6 +126,12 @@ function App() {
       </main>
     </>
   )
+}
+
+/** The Visible objects without a Highlight Card: a highlighted object's details are on its card. */
+function notHighlighted({ highlights, visible_objects }: CosmicReport): SkyObject[] {
+  const onCards = new Set(highlights.map((highlight) => highlight.id))
+  return visible_objects.filter((body) => !onCards.has(body.id))
 }
 
 export default App

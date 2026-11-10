@@ -789,7 +789,7 @@ test('shows no Highlight Cards on a Quiet Night', async () => {
   const headline = await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
   expect(screen.queryByRole('article')).not.toBeInTheDocument()
   expect(
-    screen.queryByRole('region', { name: 'Visible tonight' }),
+    screen.queryByRole('region', { name: 'Also visible tonight' }),
   ).not.toBeInTheDocument()
   // Only the Headline: no empty card list, no Viewing Window, no error styling.
   expect(headline.parentElement?.children).toHaveLength(1)
@@ -831,6 +831,15 @@ const THREE_CARD_NIGHT = {
     JUPITER,
     { ...JUPITER, id: 'moon:moon', object_type: 'moon', name: 'Moon', magnitude: -11.2 },
     ANDROMEDA,
+    {
+      ...ANDROMEDA,
+      id: 'constellation:cas',
+      name: 'Cassiopeia',
+      peak_altitude_degrees: 81.6,
+      azimuth_at_peak_degrees: 2.1,
+      rises_at: null,
+      sets_at: null,
+    },
     POLARIS,
   ],
 }
@@ -885,7 +894,7 @@ test('expands each Highlight Card independently', async () => {
   expect(detailsOf(andromeda)).toBeInTheDocument()
 })
 
-test('says a body does not rise or set tonight when those times are null, and omits a missing magnitude', async () => {
+test('says a body does not rise or set tonight when those times are null, and dashes a missing magnitude', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
@@ -899,31 +908,31 @@ test('says a body does not rise or set tonight when those times are null, and om
   expect(details).toHaveTextContent("RisesDoesn't rise tonight")
   expect(details).toHaveTextContent("SetsDoesn't set tonight")
   expect(details).not.toHaveTextContent(/\d:\d\d/)
-  expect(detailsOf(andromeda)).not.toHaveTextContent('Magnitude')
+  expect(detailsOf(andromeda)).toHaveTextContent(/Magnitude-$/)
 })
 
-test('lists every Visible object once in a shared section below the cards', async () => {
+test('lists every Visible object not on a card once, in a shared section below the cards', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  const section = await screen.findByRole('region', { name: 'Visible tonight' })
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
   const cards = screen.getAllByRole('article')
   expect(
     cards.at(-1)!.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
   expect(within(section).queryByRole('table')).not.toBeInTheDocument()
 
-  fireEvent.click(within(section).getByRole('button', { name: 'Show all 4' }))
+  fireEvent.click(within(section).getByRole('button', { name: 'Show all 2' }))
 
+  // Jupiter, Andromeda and Polaris are on cards, so their details stay there.
   const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
   expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
-    'Jupiter',
     'Moon',
-    'Andromeda',
-    'Polaris',
+    'Cassiopeia',
   ])
-  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM-2.0')
-  expect(rows[3]).toHaveTextContent("41°0° NDoesn't rise tonightDoesn't set tonight2.0")
+  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM-11.2')
+  expect(rows[1]).toHaveTextContent("82°2° NDoesn't rise tonightDoesn't set tonight-")
+  expect(rows[1].lastElementChild).toHaveTextContent(/^-$/)
   expect(screen.getAllByRole('table')).toHaveLength(1)
 
   fireEvent.click(within(section).getByRole('button', { name: 'Hide' }))
@@ -935,7 +944,7 @@ test("shows the Viewing Window's start and end in local time", async () => {
   respondWith(THREE_CARD_NIGHT)
   renderApp()
 
-  const section = await screen.findByRole('region', { name: 'Visible tonight' })
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
 
   // 02:30 and 13:10 UTC, in Los Angeles where the tests run.
   expect(section).toHaveTextContent('Dark from 6:30 PM to 5:10 AM')

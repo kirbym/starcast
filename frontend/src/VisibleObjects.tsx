@@ -3,8 +3,9 @@ import { Altitude, Azimuth, LocalTime, Magnitude, RiseTime, SetTime } from './Po
 import type { SkyObject, ViewingWindow } from './report.ts'
 
 /** The Detail Layer's shared part, shown once below the cards: the night's Viewing Window, and
- * every Visible object with its positional fields. The list starts collapsed, so the Casual Layer
- * carries no positional data. */
+ * the other Visible objects with their positional fields. Objects on a card are left to the card,
+ * so the two parts never repeat each other. The list starts collapsed, so the Casual Layer carries
+ * no positional data. */
 export function VisibleObjects({
   viewingWindow,
   objects,
@@ -17,7 +18,7 @@ export function VisibleObjects({
   const listId = useId()
   return (
     <section className="visible-objects" aria-labelledby={headingId}>
-      <h2 id={headingId}>Visible tonight</h2>
+      <h2 id={headingId}>Also visible tonight</h2>
       <p className="viewing-window">
         Dark from <LocalTime moment={viewingWindow.starts_at} /> to{' '}
         <LocalTime moment={viewingWindow.ends_at} />
@@ -63,7 +64,7 @@ export function VisibleObjects({
                     <SetTime moment={body.sets_at} />
                   </td>
                   <td>
-                    {body.magnitude === null ? '–' : <Magnitude magnitude={body.magnitude} />}
+                    <Magnitude magnitude={body.magnitude} />
                   </td>
                 </tr>
               ))}

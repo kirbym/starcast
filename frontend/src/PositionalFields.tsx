@@ -23,9 +23,9 @@ export function Azimuth({ degrees }: { degrees: number }) {
   return <>{`${Math.round(degrees) % 360}° ${point}`}</>
 }
 
-/** "-2.0": magnitude to a tenth. */
-export function Magnitude({ magnitude }: { magnitude: number }) {
-  return <>{magnitude.toFixed(1)}</>
+/** "-2.0": magnitude to a tenth, or "-" when the body has none (a constellation). */
+export function Magnitude({ magnitude }: { magnitude: number | null }) {
+  return <>{magnitude === null ? '-' : magnitude.toFixed(1)}</>
 }
 
 /** A rise time, or that the body is already up and doesn't rise during the Viewing Window. */
@@ -38,7 +38,7 @@ export function SetTime({ moment }: { moment: string | null }) {
   return moment ? <LocalTime moment={moment} /> : <>Doesn't set tonight</>
 }
 
-/** A body's positional fields, as rows of a description list. A missing magnitude is left out. */
+/** A body's positional fields, as rows of a description list. */
 export function PositionalFields({ body }: { body: SkyObject }) {
   return (
     <>
@@ -58,14 +58,10 @@ export function PositionalFields({ body }: { body: SkyObject }) {
       <dd>
         <SetTime moment={body.sets_at} />
       </dd>
-      {body.magnitude !== null && (
-        <>
-          <dt>Magnitude</dt>
-          <dd>
-            <Magnitude magnitude={body.magnitude} />
-          </dd>
-        </>
-      )}
+      <dt>Magnitude</dt>
+      <dd>
+        <Magnitude magnitude={body.magnitude} />
+      </dd>
     </>
   )
 }
