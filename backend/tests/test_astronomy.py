@@ -565,8 +565,10 @@ def test_named_comet_fainter_than_magnitude_6_is_not_visible_even_above_the_hori
 @pytest.mark.parametrize("ids", [("comet:neowise", "dso:m13"), ("dso:m13", "comet:neowise")])
 def test_bright_named_comet_outranks_a_fainter_dso_in_category_3(ids):
     # On NEOWISE's night the Hercules Cluster (V 5.8) passes almost overhead while the comet
-    # stays low, but brightness ranks first.
-    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT, only_featured(*ids))
+    # stays low, but brightness ranks first. Saturn reaches opposition that night, so the Planets
+    # are left out to keep its Significant Event from taking Category 3.
+    catalog = replace(only_featured(*ids), planets_and_moon=())
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT, catalog)
     neowise, hercules = (visible_body(sky, body_id) for body_id in ("comet:neowise", "dso:m13"))
     assert hercules.peak_altitude_degrees > neowise.peak_altitude_degrees
 
@@ -686,3 +688,102 @@ def test_dso_near_a_planet_never_makes_a_conjunction():
     assert {"planet:venus", "dso:m45"} <= visible_ids(sky)
 
     assert category_3_highlight(sky).id == "dso:m45"
+
+
+# Mars reached opposition at 23:26 UTC on 2020-10-13: the evening of the 13th in New York.
+MARS_OPPOSITION_NIGHT = date(2020, 10, 13)
+
+
+@pytest.mark.parametrize(
+    "night",
+    [
+        pytest.param(MARS_OPPOSITION_NIGHT - timedelta(days=1), id="night-before"),
+        pytest.param(MARS_OPPOSITION_NIGHT, id="night-of"),
+        pytest.param(MARS_OPPOSITION_NIGHT + timedelta(days=1), id="night-after"),
+    ],
+)
+def test_superior_planet_within_a_night_of_opposition_is_the_category_3_highlight(night):
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", night)
+
+    opposition = significant_event(sky)
+    assert opposition.id == "significant_event:opposition_mars"
+    assert opposition.category == "featured"
+    assert opposition.name == "Mars at opposition"
+    assert opposition.event.event_type == "opposition"
+    assert opposition.event.related_object_names == ("Mars",)
+    # Where and when to look: Mars itself, at its highest tonight.
+    mars = visible_body(sky, "planet:mars")
+    assert opposition.peak_altitude_degrees == mars.peak_altitude_degrees
+    assert opposition.azimuth_at_peak_degrees == mars.azimuth_at_peak_degrees
+    assert (opposition.rises_at, opposition.sets_at) == (mars.rises_at, mars.sets_at)
+    assert opposition.magnitude == mars.magnitude
+    window = sky.viewing_window
+    assert window.starts_at <= opposition.event.peak_time <= window.ends_at
+    # The exact moment of opposition is for the Narrator.
+    opposition_time = datetime.fromisoformat(opposition.context["opposition_time"])
+    assert abs(opposition_time - utc(2020, 10, 13, 23, 26)) <= timedelta(minutes=1)
+    # The event is a Highlight, not a body: Mars is listed as Visible instead.
+    assert "significant_event" not in {body.object_type for body in sky.visible_objects}
+
+
+@pytest.mark.parametrize(
+    "night",
+    [
+        pytest.param(MARS_OPPOSITION_NIGHT - timedelta(days=2), id="two-nights-before"),
+        pytest.param(MARS_OPPOSITION_NIGHT + timedelta(days=2), id="two-nights-after"),
+    ],
+)
+def test_superior_planet_two_nights_from_opposition_is_not_an_event(night):
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", night)
+    assert "planet:mars" in visible_ids(sky)
+
+    assert significant_event(sky) is None
+
+
+@pytest.mark.parametrize("key", ["mercury", "venus"])
+def test_inner_planet_is_never_at_opposition(key):
+    # An inner planet never reaches opposition, but Skyfield's search reports some of its
+    # conjunctions with the Sun as one. Such a night has it too near the Sun to be Visible, so
+    # stand the inner planet where Mars is on Mars's opposition night to show it is never flagged.
+    planets = tuple(
+        replace(body, target="mars barycenter") if body.key == key else body
+        for body in CATALOG.planets_and_moon
+        if body.key != "mars"
+    )
+    sky = compute_night_sky(
+        *NEW_YORK,
+        "America/New_York",
+        MARS_OPPOSITION_NIGHT,
+        replace(CATALOG, planets_and_moon=planets),
+    )
+    assert f"planet:{key}" in visible_ids(sky)
+
+    assert significant_event(sky) is None
+
+
+def test_planet_must_be_visible_to_be_at_opposition():
+    # Mars at opposition is up all night from New York. Left out of the catalog, it is not
+    # Visible, so its opposition is not an event.
+    planets = tuple(body for body in CATALOG.planets_and_moon if body.key != "mars")
+    sky = compute_night_sky(
+        *NEW_YORK,
+        "America/New_York",
+        MARS_OPPOSITION_NIGHT,
+        replace(CATALOG, planets_and_moon=planets),
+    )
+
+    assert significant_event(sky) is None
+
+
+def test_conjunction_outranks_an_opposition_the_same_night():
+    # 2022-12-07 from New York: Mars reaches opposition at 05:42 UTC on the 8th, in the middle of
+    # the night, as the full Moon passes over it.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2022, 12, 7))
+
+    assert significant_event(sky).id == "significant_event:conjunction_mars_moon"
+    # Without the Moon, the opposition stands.
+    planets = tuple(body for body in CATALOG.planets_and_moon if body.key != "moon")
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", date(2022, 12, 7), replace(CATALOG, planets_and_moon=planets)
+    )
+    assert significant_event(sky).id == "significant_event:opposition_mars"

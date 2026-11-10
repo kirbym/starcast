@@ -58,9 +58,11 @@ function DetailLayer({ event }: { event: SignificantEvent }) {
       {expanded && (
         <section id={regionId} className="detail-layer" aria-labelledby={toggleId}>
           <dl>
+            <dt>Event</dt>
+            <dd>{EVENT_NAMES[event.event_type]}</dd>
             {event.related_object_names && (
               <>
-                <dt>Bodies</dt>
+                <dt>{event.event_type === 'opposition' ? 'Planet' : 'Bodies'}</dt>
                 <dd>{joinNames(event.related_object_names)}</dd>
               </>
             )}
@@ -73,6 +75,12 @@ function DetailLayer({ event }: { event: SignificantEvent }) {
       )}
     </>
   )
+}
+
+const EVENT_NAMES: Record<SignificantEvent['event_type'], string> = {
+  conjunction: 'Conjunction',
+  opposition: 'Opposition',
+  meteor_shower: 'Meteor shower',
 }
 
 /** "Jupiter and Saturn", or "Mars, Jupiter and Saturn". */
