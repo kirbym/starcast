@@ -15,7 +15,7 @@ A celestial body that StarCast knows about and can compute a position for. Being
 _Avoid_: "supported", "tracked", "available"
 
 **Visible**:
-A catalog body whose center point (or centroid, for extended objects) reaches a positive altitude at some moment during the Viewing Window for the observer's location. Visibility is a binary per-night determination; it does not imply naked-eye detectability or any minimum brightness threshold.
+A catalog body whose center point (or centroid, for extended objects) reaches a positive altitude at some moment during the Viewing Window for the observer's location. Visibility is a binary per-night determination; it does not imply naked-eye detectability or any minimum brightness threshold. The one exception is a Named Comet, which must also reach magnitude 6.0.
 _Avoid_: "up", "observable", "detectable"
 
 **Peak Altitude**:
@@ -86,7 +86,7 @@ A non-stellar, non-solar-system object in the Messier catalog (M1–M110). Inclu
 _Avoid_: "deep sky", "Messier object", "extended object" (use DSO)
 
 **Named Comet**:
-A comet with an established proper name (e.g., Halley, Hale-Bopp) that appears in the catalog. Treated as a Category 3 candidate.
+A comet with an established proper name (e.g., Halley, Hale-Bopp) that appears in the catalog. Treated as a Category 3 candidate. Unlike every other body, a Named Comet counts as Visible only when its computed magnitude for the night is 6.0 or brighter, since one far from the Sun is far too faint to see.
 _Avoid_: "comet", "periodic comet" (unnamed periodic comets are not in the catalog)
 
 ### UI

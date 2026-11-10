@@ -2,8 +2,13 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from skyfield.api import Loader, load, wgs84
+from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
+from skyfield.data import mpc
 
-from app.astronomy import CATALOG, Catalog, compute_night_sky
+from app.astronomy import CATALOG, EPHEMERIS_FILE, Catalog, compute_night_sky, data_dir
+from app.comets import PINNED_ELEMENTS_ENV
+from tests.conftest import PINNED_COMET_ELEMENTS
 
 # Published values: USNO "Astronomical Twilight for 2026" tables, retrieved 2026-11-04 from
 # https://aa.usno.navy.mil/calculated/rstt/year (task=4). The tables print whole minutes in
@@ -480,3 +485,116 @@ def test_highlights_from_all_three_categories_appear_together_in_category_order(
         "constellation",
         "featured",
     ]
+
+
+NAMED_COMET_KEYS = {
+    "halley",
+    "encke",
+    "ikeya_zhang",
+    "hale_bopp",
+    "hyakutake",
+    "neowise",
+    "tsuchinshan_atlas",
+    "west",
+    "bennett",
+    "ikeya_seki",
+    "lovejoy",
+}
+# 2020-07-20 from New York: Comet NEOWISE, two weeks past perihelion and nearing its closest
+# approach to Earth, hangs low in the north-west after dusk below the Big Dipper.
+NEOWISE_NIGHT = date(2020, 7, 20)
+
+
+def comets(sky) -> list:
+    return [body for body in sky.visible_objects if body.object_type == "comet"]
+
+
+def test_all_11_named_comets_are_in_catalog_as_featured_bodies():
+    named = [body for body in CATALOG.featured if body.object_type == "comet"]
+
+    assert {body.id for body in named} == {f"comet:{key}" for key in NAMED_COMET_KEYS}
+    assert {body.category for body in named} == {"featured"}
+    names = {body.name for body in named}
+    assert {"Halley's Comet", "Comet Hale-Bopp", "Comet NEOWISE"} <= names
+
+
+def test_bright_named_comet_is_visible_with_its_computed_magnitude():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT)
+
+    neowise = visible_body(sky, "comet:neowise")
+    assert neowise.category == "featured"
+    assert neowise.name == "Comet NEOWISE"
+    # Observers put it near magnitude 3 that week, an easy naked-eye sight.
+    assert 2.0 < neowise.magnitude < 4.5
+    # Low in the north-west at dusk, before it sets for the night.
+    assert 5 < neowise.peak_altitude_degrees < 25
+    assert 270 < neowise.azimuth_at_peak_degrees < 360
+    assert neowise.sets_at is not None
+    assert neowise.context["designation"] == "C/2020 F3"
+    assert neowise.context["perihelion_date"] == "2020-07-05"
+    # Every other Named Comet is far from the Sun and far too faint.
+    assert [body.id for body in comets(sky)] == ["comet:neowise"]
+
+
+def neowise_altitude_at_dusk(night: date) -> float:
+    """NEOWISE's altitude from New York as the night's Viewing Window opens, computed from the
+    pinned elements independently of the engine."""
+    with PINNED_COMET_ELEMENTS.open("rb") as file:
+        rows = mpc.load_comets_dataframe(file).set_index("designation", drop=False)
+    timescale = load.timescale(builtin=True)
+    ephemeris = Loader(str(data_dir()), verbose=False)(EPHEMERIS_FILE)
+    neowise = ephemeris["sun"] + mpc.comet_orbit(rows.loc["C/2020 F3 (NEOWISE)"], timescale, GM_SUN)
+    dusk = compute_night_sky(*NEW_YORK, "America/New_York", night).viewing_window.starts_at
+    observer = ephemeris["earth"] + wgs84.latlon(*NEW_YORK)
+    moment = timescale.from_datetime(dusk)
+    return observer.at(moment).observe(neowise).apparent().altaz()[0].degrees
+
+
+def test_named_comet_fainter_than_magnitude_6_is_not_visible_even_above_the_horizon():
+    # 2020-08-20: NEOWISE still stands above the western horizon at dusk, but six weeks past
+    # perihelion it has faded to around magnitude 8, beyond the naked eye.
+    night = date(2020, 8, 20)
+    assert neowise_altitude_at_dusk(night) > 5
+
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", night, only_featured("comet:neowise"))
+
+    assert comets(sky) == []
+    assert category_3_highlight(sky) is None
+
+
+@pytest.mark.parametrize("ids", [("comet:neowise", "dso:m13"), ("dso:m13", "comet:neowise")])
+def test_bright_named_comet_outranks_a_fainter_dso_in_category_3(ids):
+    # On NEOWISE's night the Hercules Cluster (V 5.8) passes almost overhead while the comet
+    # stays low, but brightness ranks first.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT, only_featured(*ids))
+    neowise, hercules = (visible_body(sky, body_id) for body_id in ("comet:neowise", "dso:m13"))
+    assert hercules.peak_altitude_degrees > neowise.peak_altitude_degrees
+
+    assert category_3_highlight(sky).id == "comet:neowise"
+
+
+def test_missing_comet_elements_omit_the_named_comets_and_the_night_still_computes(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(tmp_path / "missing.txt"))
+
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT)
+
+    assert comets(sky) == []
+    assert [body.category for body in sky.highlights] == [
+        "planet_moon",
+        "constellation",
+        "featured",
+    ]
+
+
+def test_named_comet_whose_elements_cannot_be_used_is_left_out(monkeypatch):
+    def unusable_orbit(*_args):
+        raise ValueError("unusable orbital elements")
+
+    monkeypatch.setattr(mpc, "comet_orbit", unusable_orbit)
+
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT)
+
+    assert comets(sky) == []
+    assert category_3_highlight(sky) is not None

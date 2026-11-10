@@ -272,6 +272,7 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
         "moon": "planet_moon",
         "constellation": "constellation",
         "bright_star": "featured",
+        "comet": "featured",
         "dso": "featured",
     }
     for body in visible:
@@ -280,6 +281,18 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
     sirius = next(body for body in visible if body["id"] == "bright_star:sirius")
     assert sirius["magnitude"] == pytest.approx(-1.44)
     assert sirius["peak_altitude_degrees"] > 0
+
+
+def test_bright_named_comet_is_listed_with_its_computed_magnitude(client: TestClient):
+    # 2020-07-20 from New York: Comet NEOWISE hangs low in the north-west after dusk.
+    response = client.post("/api/report", json={**VALID_REQUEST, "date": "2020-07-20"})
+
+    assert response.status_code == 200
+    comets = [body for body in response.json()["visible_objects"] if body["object_type"] == "comet"]
+    assert [comet["id"] for comet in comets] == ["comet:neowise"]
+    assert comets[0]["category"] == "featured"
+    assert comets[0]["name"] == "Comet NEOWISE"
+    assert comets[0]["magnitude"] < 6.0
 
 
 @pytest.mark.parametrize(

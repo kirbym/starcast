@@ -39,6 +39,8 @@ uv run pytest tests/test_astronomy.py::test_name       # single test
 
 The first astronomy run downloads the DE440s ephemeris (~32 MB) to `backend/.cache/skyfield`, or to `STARCAST_DATA_DIR` if set.
 
+The Named Comets (`app/comets.py`) are placed from the MPC's `AllCometEls.txt` (~0.8 MB). It is downloaded to the same data directory on first use and refreshed after 30 days. If it is missing, or stale and the refresh fails, reports go out without comets. Set `STARCAST_COMET_ELEMENTS` to an elements file to pin it instead. `tests/conftest.py` does this for every test with `tests/fixtures/comet_elements.txt`, so tests never fetch it.
+
 `tests/test_claude_narrator.py` has one opt-in test that calls the real Claude API. It is skipped unless `ANTHROPIC_API_KEY` is set.
 
 ### Frontend (`frontend/`)

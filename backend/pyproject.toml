@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic>=2.5.0",
     "fastapi>=0.115",
+    "pandas>=2.2",
     "skyfield>=1.55",
     "tzdata>=2026.6",
     "uvicorn[standard]>=0.32",
@@ -16,6 +17,12 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=8.3",
     "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Skyfield's Kepler orbits, used for the Named Comets, still set NumPy array shapes directly.
+    "ignore:Setting the shape on a NumPy array:DeprecationWarning:skyfield.keplerlib",
 ]
 
 [tool.ruff]
