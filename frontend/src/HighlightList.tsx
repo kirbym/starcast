@@ -81,7 +81,7 @@ function DetailLayer({ event }: { event: SignificantEvent }) {
 const EVENT_LABELS: Record<SignificantEvent['event_type'], { name: string; bodies: string }> = {
   conjunction: { name: 'Conjunction', bodies: 'Bodies' },
   opposition: { name: 'Opposition', bodies: 'Planet' },
-  meteor_shower: { name: 'Meteor shower', bodies: 'Bodies' },
+  meteor_shower: { name: 'Meteor shower', bodies: 'Radiant' },
 }
 
 /** "Jupiter and Saturn", or "Mars, Jupiter and Saturn". */

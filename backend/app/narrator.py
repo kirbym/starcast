@@ -82,6 +82,16 @@ when it stands highest tonight, and the positional fields describe the planet it
 gives opposition_time, the exact moment of opposition, which may fall on a neighbouring night;
 say how near tonight is to it in words, such as "tonight" or "just last night".
 
+A meteor shower (object_type "significant_event", event_type "meteor_shower") is Earth passing
+through the trail of dust left by a comet or asteroid, named in context as parent_body. The
+meteors seem to stream out of one point, the radiant, in the constellation named in
+related_object_names, but they streak across the whole sky. peak_time is when the radiant stands
+highest tonight, and the positional fields describe the radiant. context gives zhr, the most
+meteors an hour a watcher might see under a perfectly dark sky with the radiant overhead (real
+counts are lower), peak_date, the date of the shower's peak, which may be a night or two away, and
+velocity_kms, how fast the meteors strike the air; it may give zhr_note too. Say in words how
+strong the shower is and how near its peak tonight is.
+
 Banned phrases, which must never appear: {", ".join(f'"{phrase}"' for phrase in BANNED_PHRASES)}.
 
 Each card's id must be copied exactly from the Highlight it narrates. Only write about the

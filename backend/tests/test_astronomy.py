@@ -659,8 +659,11 @@ def test_body_can_be_the_category_1_highlight_and_part_of_the_category_3_conjunc
 
 def test_pair_within_2_degrees_only_below_the_horizon_is_not_a_conjunction():
     # 2019-08-11 from New York: the Moon closes to about 1.6 degrees from Saturn before dawn, but
-    # only after both have set. While both are up they stay more than 2.2 degrees apart.
-    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2019, 8, 11))
+    # only after both have set. While both are up they stay more than 2.2 degrees apart. The
+    # Perseids peak the next night, so the meteor showers are left out.
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", date(2019, 8, 11), replace(CATALOG, meteor_showers=())
+    )
     assert {"moon:moon", "planet:saturn"} <= visible_ids(sky)
 
     assert significant_event(sky) is None
@@ -789,3 +792,179 @@ def test_conjunction_outranks_an_opposition_the_same_night():
         *NEW_YORK, "America/New_York", date(2022, 12, 7), without_planets("moon")
     )
     assert significant_event(sky).id == "significant_event:opposition_mars"
+
+
+def meteor_shower(key: str):
+    """A bundled meteor shower, by its lower-case IAU code."""
+    return next(shower for shower in CATALOG.meteor_showers if shower.key == key)
+
+
+def with_showers(*showers) -> Catalog:
+    """The real catalog, with only the given meteor showers."""
+    return replace(CATALOG, meteor_showers=showers)
+
+
+def test_bundled_shower_calendar_covers_the_12_major_showers():
+    assert {shower.iau_code for shower in CATALOG.meteor_showers} >= {
+        "QUA", "LYR", "ETA", "ARI", "SDA", "CAP", "PER", "DRA", "ORI", "LEO", "GEM", "URS",
+    }  # fmt: skip
+    perseids = meteor_shower("per")
+    assert perseids.name == "Perseids"
+    assert (perseids.peak_month, perseids.peak_day) == (8, 12)
+    assert perseids.zhr == 100
+    assert perseids.radiant_constellation == "Perseus"
+    assert perseids.hemisphere == "north"
+    assert perseids.daytime is False
+    assert meteor_shower("ari").daytime is True
+    assert meteor_shower("ori").hemisphere is None
+
+
+# The Perseids peak on 12 August each year.
+PERSEIDS_PEAK_NIGHT = date(2026, 8, 12)
+# Darwin, at 12 degrees south, where the Perseid radiant still climbs well above the horizon.
+DARWIN = (-12.4634, 130.8456)
+
+
+def test_perseids_on_their_peak_night_are_the_category_3_highlight():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", PERSEIDS_PEAK_NIGHT)
+
+    shower = significant_event(sky)
+    assert shower.id == "significant_event:meteor_shower_per"
+    assert shower.category == "featured"
+    assert shower.name == "Perseids meteor shower"
+    assert shower.magnitude is None
+    assert shower.event.event_type == "meteor_shower"
+    # Meteors streak out of the radiant, so the Detail Layer names its constellation.
+    assert shower.event.related_object_names == ("Perseus",)
+    # Where and when to look: the radiant, at its highest within the night. In August it climbs
+    # all night from New York, so it peaks as the Viewing Window closes, high in the north-east.
+    window = sky.viewing_window
+    assert window.starts_at <= shower.event.peak_time <= window.ends_at
+    assert window.ends_at - shower.event.peak_time <= timedelta(minutes=5)
+    assert 40 < shower.peak_altitude_degrees < 90
+    assert 0 < shower.azimuth_at_peak_degrees < 90
+    assert shower.context["zhr"] == 100
+    assert shower.context["peak_date"] == "2026-08-12"
+    assert shower.context["parent_body"] == "109P/Swift-Tuttle"
+    # The event is a Highlight, not a body.
+    assert "significant_event" not in {body.object_type for body in sky.visible_objects}
+
+
+def test_shower_favouring_the_other_hemisphere_is_not_an_event():
+    # From Darwin the Perseid radiant rises, but the Perseids favour the Northern Hemisphere.
+    sky = compute_night_sky(*DARWIN, "Australia/Darwin", PERSEIDS_PEAK_NIGHT)
+    assert significant_event(sky) is None
+
+    # Without its hemisphere note, the same shower is flagged there.
+    everywhere = replace(meteor_shower("per"), hemisphere=None)
+    sky = compute_night_sky(
+        *DARWIN, "Australia/Darwin", PERSEIDS_PEAK_NIGHT, with_showers(everywhere)
+    )
+    assert significant_event(sky).id == "significant_event:meteor_shower_per"
+
+
+def test_shower_whose_radiant_never_rises_is_not_an_event():
+    # From Sydney, at 34 degrees south, the Perseid radiant (+58 degrees) never clears the horizon.
+    everywhere = replace(meteor_shower("per"), hemisphere=None)
+    sky = compute_night_sky(
+        *SYDNEY, "Australia/Sydney", PERSEIDS_PEAK_NIGHT, with_showers(everywhere)
+    )
+
+    assert significant_event(sky) is None
+
+
+def test_orionids_at_zhr_20_qualify():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 10, 21))
+
+    shower = significant_event(sky)
+    assert shower.id == "significant_event:meteor_shower_ori"
+    assert shower.event.related_object_names == ("Orion",)
+
+
+def test_april_lyrids_at_zhr_18_do_not_qualify():
+    # 2026-04-22 from New York: Venus passes Uranus that evening; leave them out.
+    catalog = without_planets("venus", "uranus")
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 4, 22), catalog)
+    assert significant_event(sky) is None
+
+    # At ZHR 20 the same shower would qualify.
+    stronger = replace(meteor_shower("lyr"), zhr=20)
+    sky = compute_night_sky(
+        *NEW_YORK,
+        "America/New_York",
+        date(2026, 4, 22),
+        replace(catalog, meteor_showers=(stronger,)),
+    )
+    assert significant_event(sky).id == "significant_event:meteor_shower_lyr"
+
+
+def test_daytime_shower_never_qualifies():
+    # The Daytime Arietids peak on 7 June at ZHR 30, but their radiant sits near the Sun.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 6, 7))
+    assert significant_event(sky) is None
+
+    # Its radiant still clears the horizon before dawn, so as a night shower it would qualify.
+    at_night = replace(meteor_shower("ari"), daytime=False)
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 6, 7), with_showers(at_night))
+    assert significant_event(sky).id == "significant_event:meteor_shower_ari"
+
+
+@pytest.mark.parametrize(
+    ("days_from_peak", "flagged"),
+    [(-3, False), (-2, True), (2, True), (3, False)],
+)
+def test_shower_qualifies_within_2_days_of_its_peak(days_from_peak, flagged):
+    night = PERSEIDS_PEAK_NIGHT + timedelta(days=days_from_peak)
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", night, with_showers(meteor_shower("per"))
+    )
+
+    event = significant_event(sky)
+    assert (event is not None and event.id == "significant_event:meteor_shower_per") == flagged
+
+
+@pytest.mark.parametrize(
+    ("night", "flagged", "peak_date"),
+    [
+        pytest.param(date(2027, 1, 3), True, "2027-01-03", id="peak-night"),
+        pytest.param(date(2027, 1, 1), True, "2027-01-03", id="two-nights-before"),
+        pytest.param(date(2027, 1, 5), True, "2027-01-03", id="two-nights-after"),
+        pytest.param(date(2026, 12, 31), False, None, id="three-nights-before-across-new-year"),
+        pytest.param(date(2026, 12, 29), False, None, id="five-nights-before"),
+    ],
+)
+def test_quadrantids_peak_is_found_across_the_year_boundary(night, flagged, peak_date):
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", night, with_showers(meteor_shower("qua"))
+    )
+
+    shower = significant_event(sky)
+    if not flagged:
+        assert shower is None
+        return
+    assert shower.id == "significant_event:meteor_shower_qua"
+    assert shower.context["peak_date"] == peak_date
+
+
+def test_highest_zhr_wins_among_several_qualifying_showers():
+    orionids = meteor_shower("ori")
+    stronger = replace(orionids, key="xor", name="Stronger Orionids", zhr=60)
+    for showers in [(orionids, stronger), (stronger, orionids)]:
+        sky = compute_night_sky(
+            *NEW_YORK, "America/New_York", date(2026, 10, 21), with_showers(*showers)
+        )
+        assert significant_event(sky).id == "significant_event:meteor_shower_xor"
+
+
+def test_opposition_outranks_a_meteor_shower_the_same_night():
+    # 2021-08-01 from Sydney: Saturn reaches opposition at 06:00 UTC on the 2nd, the next night,
+    # and the Southern Delta Aquariids, which favour the south, are two nights past their peak.
+    # Mars, passing Regulus that evening, is left out so no conjunction outranks both.
+    sky = compute_night_sky(*SYDNEY, "Australia/Sydney", date(2021, 8, 1), without_planets("mars"))
+
+    assert significant_event(sky).id == "significant_event:opposition_saturn"
+    # Without Saturn, the shower stands.
+    sky = compute_night_sky(
+        *SYDNEY, "Australia/Sydney", date(2021, 8, 1), without_planets("mars", "saturn")
+    )
+    assert significant_event(sky).id == "significant_event:meteor_shower_sda"

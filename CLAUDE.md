@@ -37,6 +37,8 @@ uv run pytest tests/test_astronomy.py::test_name       # single test
 
 `app/data/messier.csv` (the 110 Messier DSOs, from OpenNGC under CC BY-SA 4.0) is generated as well. Regenerate it with `uv run scripts/build_messier.py`, which downloads its pinned sources to `.cache/catalog-sources`, and see `docs/research/messier-catalog.md`.
 
+`app/data/meteor_showers.csv` (the meteor shower calendar, from the IMO Meteor Shower Calendar) is hand-maintained, not generated. Update it from each year's IMO calendar, and see `docs/research/meteor-shower-calendar.md`.
+
 The first astronomy run downloads the DE440s ephemeris (~32 MB) to `backend/.cache/skyfield`, or to `STARCAST_DATA_DIR` if set.
 
 The Named Comets (`app/comets.py`) are placed from the MPC's `AllCometEls.txt` (~0.8 MB). It is downloaded to the same data directory on first use and refreshed after 30 days. If it is missing, or stale and the refresh fails, reports go out without comets. Set `STARCAST_COMET_ELEMENTS` to an elements file to pin it instead. `tests/conftest.py` does this for every test with `tests/fixtures/comet_elements.txt`, so tests never fetch it.

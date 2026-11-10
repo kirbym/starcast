@@ -371,6 +371,40 @@ def test_narrator_receives_the_opposition_event_and_its_exact_moment(
     assert received["context"]["opposition_time"].startswith("2020-10-13T23:2")
 
 
+# New York on 2026-08-12: the Perseids peak.
+PERSEIDS_REQUEST = {**VALID_REQUEST, "date": "2026-08-12"}
+
+
+def test_meteor_shower_highlight_carries_its_event(client: TestClient):
+    response = client.post("/api/report", json=PERSEIDS_REQUEST)
+
+    assert response.status_code == 200
+    event_highlight = response.json()["highlights"][-1]
+    assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
+    assert event_highlight["id"] == "significant_event:meteor_shower_per"
+    assert event_highlight["category"] == "featured"
+    assert event_highlight["object_type"] == "significant_event"
+    assert event_highlight["name"] == "Perseids meteor shower"
+    assert event_highlight["magnitude"] is None
+    event = event_highlight["event"]
+    assert event["event_type"] == "meteor_shower"
+    assert re.fullmatch(r"2026-08-1[23]T\d\d:\d\d:\d\dZ", event["peak_time"])
+    assert event["related_object_names"] == ["Perseus"]
+
+
+def test_narrator_receives_the_meteor_shower_and_its_catalog_facts(
+    client: TestClient, narrator: FakeNarrator
+):
+    client.post("/api/report", json=PERSEIDS_REQUEST)
+
+    received = narrator.received[-1]
+    assert received["id"] == "significant_event:meteor_shower_per"
+    assert received["event"]["event_type"] == "meteor_shower"
+    assert received["context"]["zhr"] == 100
+    assert received["context"]["peak_date"] == "2026-08-12"
+    assert received["context"]["parent_body"] == "109P/Swift-Tuttle"
+
+
 @pytest.mark.parametrize(
     "cards",
     [
