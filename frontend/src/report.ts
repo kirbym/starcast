@@ -59,8 +59,52 @@ export async function fetchReport(location: Location): Promise<CosmicReport> {
       location_label: location.label,
     }),
   })
-  if (!response.ok) {
-    throw new Error(`Report request failed with status ${response.status}`)
-  }
+  if (!response.ok) throw await reportError(response)
   return response.json()
+}
+
+/** The error `type`s the backend's `{error: {statusCode, type, message}}` envelope can carry. */
+export type ReportErrorType =
+  | 'invalid_location'
+  | 'narration_failed'
+  | 'internal_error'
+
+/**
+ * A report request the backend refused or failed. `message` is the backend's
+ * own, for the console only: it is never shown to the user.
+ */
+export class ReportError extends Error {
+  readonly type: ReportErrorType
+  readonly statusCode: number
+
+  constructor(statusCode: number, type: ReportErrorType, message: string) {
+    super(message)
+    this.name = 'ReportError'
+    this.statusCode = statusCode
+    this.type = type
+  }
+}
+
+async function reportError(response: Response): Promise<ReportError> {
+  const fallback = `Report request failed with status ${response.status}`
+  try {
+    const { error } = (await response.json()) as {
+      error?: { type?: unknown; message?: unknown }
+    }
+    if (isReportErrorType(error?.type)) {
+      const message = typeof error.message === 'string' ? error.message : fallback
+      return new ReportError(response.status, error.type, message)
+    }
+  } catch {
+    // Not the error envelope; treated as the backend failing.
+  }
+  return new ReportError(response.status, 'internal_error', fallback)
+}
+
+function isReportErrorType(value: unknown): value is ReportErrorType {
+  return (
+    value === 'invalid_location' ||
+    value === 'narration_failed' ||
+    value === 'internal_error'
+  )
 }

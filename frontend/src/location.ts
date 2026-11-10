@@ -29,6 +29,15 @@ export function saveLocation(location: Location): void {
   }
 }
 
+/** Forget the saved location, once the backend has rejected it. */
+export function clearSavedLocation(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Blocked storage has nothing saved to forget.
+  }
+}
+
 function isLocation(value: unknown): value is Location {
   if (typeof value !== 'object' || value === null) return false
   const { latitude, longitude, label } = value as Record<string, unknown>

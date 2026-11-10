@@ -1,7 +1,10 @@
+import logging
 import os
+from collections.abc import Awaitable, Callable
+from time import sleep
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,7 +13,34 @@ from app.astronomy import compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
 from app.schemas import Highlight, ReportRequest, ReportResponse, SkyObject
 
+# A failed narration gets one more try, after this short wait.
+NARRATION_RETRY_DELAY_SECONDS = 1.0
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="StarCast API")
+
+
+def _error(status_code: int, error_type: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"statusCode": status_code, "type": error_type, "message": message}},
+    )
+
+
+# Registered before CORS so that CORS wraps it: an exception handler for Exception would run
+# outside every middleware, and the browser could not read a 500 without CORS headers.
+@app.middleware("http")
+async def internal_error(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Unexpected error handling %s %s", request.method, request.url.path)
+        return _error(500, "internal_error", "Something went wrong on our side.")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.environ.get("CORS_ORIGIN", "http://localhost:5173")],
@@ -25,18 +55,12 @@ def invalid_location(_request: Request, exc: RequestValidationError) -> JSONResp
         f"{'.'.join(str(part) for part in error['loc'][1:]) or 'body'}: {error['msg']}"
         for error in exc.errors()
     )
-    return JSONResponse(
-        status_code=400,
-        content={"error": {"statusCode": 400, "type": "invalid_location", "message": problems}},
-    )
+    return _error(400, "invalid_location", problems)
 
 
 @app.exception_handler(NarrationError)
 def narration_failed(_request: Request, exc: NarrationError) -> JSONResponse:
-    return JSONResponse(
-        status_code=502,
-        content={"error": {"statusCode": 502, "type": "narration_failed", "message": str(exc)}},
-    )
+    return _error(502, "narration_failed", str(exc))
 
 
 @app.get("/health")
@@ -56,18 +80,30 @@ def create_report(
         report_request.date,
     )
     highlights = [SkyObject.model_validate(body) for body in sky.highlights]
-    narration = narrator.narrate(
-        [
-            {**highlight.model_dump(mode="json"), "context": body.context}
-            for highlight, body in zip(highlights, sky.highlights, strict=True)
-        ]
-    )
+    narrated_highlights = [
+        {**highlight.model_dump(mode="json"), "context": body.context}
+        for highlight, body in zip(highlights, sky.highlights, strict=True)
+    ]
+    try:
+        headline, cards = _narrate(narrator, narrated_highlights, highlights)
+    except NarrationError as first_failure:
+        logger.warning("Narration failed, retrying once: %s", first_failure)
+        sleep(NARRATION_RETRY_DELAY_SECONDS)
+        headline, cards = _narrate(narrator, narrated_highlights, highlights)
     return ReportResponse(
-        headline=narration.headline,
+        headline=headline,
         viewing_window=sky.viewing_window,
-        highlights=_merge_cards(highlights, narration),
+        highlights=cards,
         visible_objects=[SkyObject.model_validate(body) for body in sky.visible_objects],
     )
+
+
+def _narrate(
+    narrator: Narrator, narrated_highlights: list[dict], highlights: list[SkyObject]
+) -> tuple[str, list[Highlight]]:
+    """One narration attempt: the Headline, and the Highlights with their cards attached."""
+    narration = narrator.narrate(narrated_highlights)
+    return narration.headline, _merge_cards(highlights, narration)
 
 
 def _merge_cards(highlights: list[SkyObject], narration: Narration) -> list[Highlight]:

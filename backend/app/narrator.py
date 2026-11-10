@@ -5,8 +5,8 @@ from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from typing import Any, Protocol
 
-from anthropic import Anthropic
-from pydantic import BaseModel
+from anthropic import Anthropic, APIError
+from pydantic import BaseModel, ValidationError
 
 # Structured output enforces the JSON shape because the current Sonnet rejects forced tool_choice
 # with a 400. It rejects sampling parameters too, so sampling stays at the model's default.
@@ -143,26 +143,36 @@ class Narrator(Protocol):
 
 
 class ClaudeNarrator:
-    def __init__(self) -> None:
+    def __init__(self, client: Anthropic | None = None) -> None:
         # Retrying is the endpoint's job, and the spec allows it only once.
-        self._client = Anthropic(max_retries=0)
+        self._client = client or Anthropic(max_retries=0)
 
     def narrate(self, highlights: Sequence[Mapping[str, Any]]) -> Narration:
-        response = self._client.beta.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": json.dumps(list(highlights))}],
-            output_config={"format": {"type": "json_schema", "schema": NARRATION_SCHEMA}},
-            # Sonnet thinks by default. Off saves tokens, and thinking counts against MAX_TOKENS.
-            thinking={"type": "between_tools"},
-            betas=[SERVER_SIDE_FALLBACK_BETA],
-            fallbacks="default",
-        )
+        """Narrate the Highlights, raising NarrationError when Claude fails or replies unusably."""
+        try:
+            response = self._client.beta.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": json.dumps(list(highlights))}],
+                output_config={"format": {"type": "json_schema", "schema": NARRATION_SCHEMA}},
+                # Sonnet thinks by default. Off saves tokens, and thinking counts against
+                # MAX_TOKENS.
+                thinking={"type": "between_tools"},
+                betas=[SERVER_SIDE_FALLBACK_BETA],
+                fallbacks="default",
+            )
+        except APIError as exc:
+            raise NarrationError(f"Claude call failed: {exc}") from exc
         if response.stop_reason != "end_turn":
             raise NarrationError(f"Claude stopped early: {response.stop_reason}")
-        text = next(block.text for block in response.content if block.type == "text")
-        return Narration.model_validate_json(text)
+        text = next((block.text for block in response.content if block.type == "text"), None)
+        if text is None:
+            raise NarrationError("Claude replied without text")
+        try:
+            return Narration.model_validate_json(text)
+        except ValidationError as exc:
+            raise NarrationError(f"Claude's reply does not match the schema: {exc}") from exc
 
 
 @lru_cache(maxsize=1)
