@@ -58,9 +58,11 @@ function DetailLayer({ event }: { event: SignificantEvent }) {
       {expanded && (
         <section id={regionId} className="detail-layer" aria-labelledby={toggleId}>
           <dl>
+            <dt>Event</dt>
+            <dd>{EVENT_LABELS[event.event_type].name}</dd>
             {event.related_object_names && (
               <>
-                <dt>Bodies</dt>
+                <dt>{EVENT_LABELS[event.event_type].bodies}</dt>
                 <dd>{joinNames(event.related_object_names)}</dd>
               </>
             )}
@@ -73,6 +75,13 @@ function DetailLayer({ event }: { event: SignificantEvent }) {
       )}
     </>
   )
+}
+
+/** How the Detail Layer names each event type, and the bodies it involves. */
+const EVENT_LABELS: Record<SignificantEvent['event_type'], { name: string; bodies: string }> = {
+  conjunction: { name: 'Conjunction', bodies: 'Bodies' },
+  opposition: { name: 'Opposition', bodies: 'Planet' },
+  meteor_shower: { name: 'Meteor shower', bodies: 'Bodies' },
 }
 
 /** "Jupiter and Saturn", or "Mars, Jupiter and Saturn". */

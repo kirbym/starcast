@@ -340,6 +340,37 @@ def test_conjunction_is_a_highlight_but_not_a_visible_object(client: TestClient)
     assert all(body["event"] is None for body in visible)
 
 
+# New York on 2020-10-13: Mars reaches opposition that evening.
+MARS_OPPOSITION_REQUEST = {**VALID_REQUEST, "date": "2020-10-13"}
+
+
+def test_opposition_highlight_carries_its_event(client: TestClient):
+    response = client.post("/api/report", json=MARS_OPPOSITION_REQUEST)
+
+    assert response.status_code == 200
+    event_highlight = response.json()["highlights"][-1]
+    assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
+    assert event_highlight["id"] == "significant_event:opposition_mars"
+    assert event_highlight["category"] == "featured"
+    assert event_highlight["object_type"] == "significant_event"
+    assert event_highlight["name"] == "Mars at opposition"
+    event = event_highlight["event"]
+    assert event["event_type"] == "opposition"
+    assert re.fullmatch(r"2020-10-1[34]T\d\d:\d\d:\d\dZ", event["peak_time"])
+    assert event["related_object_names"] == ["Mars"]
+
+
+def test_narrator_receives_the_opposition_event_and_its_exact_moment(
+    client: TestClient, narrator: FakeNarrator
+):
+    client.post("/api/report", json=MARS_OPPOSITION_REQUEST)
+
+    received = narrator.received[-1]
+    assert received["id"] == "significant_event:opposition_mars"
+    assert received["event"]["event_type"] == "opposition"
+    assert received["context"]["opposition_time"].startswith("2020-10-13T23:2")
+
+
 @pytest.mark.parametrize(
     "cards",
     [

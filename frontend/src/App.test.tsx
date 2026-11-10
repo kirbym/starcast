@@ -672,6 +672,58 @@ test('shows a Significant Event Highlight Card whose Detail Layer names its bodi
   expect(within(card).queryByRole('region')).not.toBeInTheDocument()
 })
 
+const MARS_OPPOSITION = {
+  id: 'significant_event:opposition_mars',
+  category: 'featured',
+  object_type: 'significant_event',
+  name: 'Mars at opposition',
+  peak_altitude_degrees: 49.2,
+  azimuth_at_peak_degrees: 180.4,
+  rises_at: '2020-10-13T22:43:12Z',
+  sets_at: '2020-10-14T11:18:40Z',
+  magnitude: -2.6,
+  event: {
+    event_type: 'opposition',
+    // Shown in the browser's time zone: 9:55 PM in Los Angeles, where the tests run.
+    peak_time: '2020-10-14T04:55:00Z',
+    related_object_names: ['Mars'],
+  },
+}
+
+test('shows an opposition Highlight Card whose Detail Layer names the event, its planet and peak time', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'Mars blazes all night long.',
+        highlights: [
+          {
+            ...MARS_OPPOSITION,
+            mini_headline: 'Mars at its brightest',
+            paragraph: 'Mars rises as the Sun sets and burns orange all night.',
+          },
+        ],
+        visible_objects: [],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'Mars at its brightest' })
+  fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
+
+  const details = within(card).getByRole('region', { name: 'Details' })
+  expect(details).toHaveTextContent('EventOpposition')
+  expect(details).toHaveTextContent('PlanetMars')
+  expect(details).toHaveTextContent('Peak9:55 PM')
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({

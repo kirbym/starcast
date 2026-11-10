@@ -46,6 +46,10 @@ EventType = Literal["conjunction", "opposition", "meteor_shower"]
 
 # The bodies that move against the stars. Only they can start a conjunction.
 _MOVING_TYPES = frozenset({"planet", "moon", "comet"})
+# The Planets beyond Earth's orbit, by catalog key. Only they can stand opposite the Sun.
+_SUPERIOR_PLANETS = frozenset({"mars", "jupiter", "saturn", "uranus", "neptune"})
+# Skyfield's almanac.oppositions_conjunctions() code for "opposite the Sun".
+_OPPOSITION = 1
 
 
 _CATEGORIES: dict[ObjectType, Category] = {
@@ -250,7 +254,8 @@ class SignificantEvent:
     """What makes a Significant Event Highlight time-sensitive: what happens, and when."""
 
     event_type: EventType
-    # The moment the event is at its best, such as a conjunction's closest approach.
+    # The moment the event is at its best: a conjunction's closest approach, or an opposition
+    # planet's Peak Altitude.
     peak_time: datetime
     related_object_names: tuple[str, ...] | None
 
@@ -317,7 +322,7 @@ def compute_night_sky(
     featured = _observe_visible(catalog.featured, observer, samples, _comet_elements(catalog))
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
-    category_3 = _category_3_highlight(planets_and_moon + featured, samples)
+    category_3 = _category_3_highlight(planets_and_moon + featured, samples, local_noon)
     highlights = [seen.body for seen in (category_1, category_2) if seen]
     if category_3:
         highlights.append(category_3)
@@ -387,13 +392,15 @@ def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
     return named_comet_elements(data_dir())
 
 
-def _category_3_highlight(observed: list[_Observation], samples: Time) -> VisibleBody | None:
+def _category_3_highlight(
+    observed: list[_Observation], samples: Time, local_noon: datetime
+) -> VisibleBody | None:
     """Category 3: a Significant Event wins outright; otherwise the best standing body.
 
     `observed` is every Visible body of the night outside Category 2. The standing candidates
     among them are the featured ones: the Bright Stars, Named Comets and DSOs.
     """
-    event = _significant_event(observed, samples)
+    event = _significant_event(observed, samples, local_noon)
     if event:
         return event
     standing = [seen for seen in observed if seen.body.category == "featured"]
@@ -401,8 +408,20 @@ def _category_3_highlight(observed: list[_Observation], samples: Time) -> Visibl
     return best.body if best else None
 
 
-def _significant_event(observed: list[_Observation], samples: Time) -> VisibleBody | None:
-    """The night's one Significant Event Highlight: for now, its tightest conjunction."""
+def _significant_event(
+    observed: list[_Observation], samples: Time, local_noon: datetime
+) -> VisibleBody | None:
+    """The night's one Significant Event Highlight.
+
+    When several qualify, a fixed event-type priority decides:
+    Conjunction > Opposition > Meteor shower.
+    Each detector only runs when every type above it has found nothing.
+    """
+    return _tightest_conjunction(observed, samples) or _opposition(observed, local_noon)
+
+
+def _tightest_conjunction(observed: list[_Observation], samples: Time) -> VisibleBody | None:
+    """The night's tightest conjunction, or None if there is none."""
     tightest = min(
         _conjunctions(observed, samples), key=lambda found: found.separation_degrees, default=None
     )
@@ -468,6 +487,55 @@ def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _C
         context={"separation_degrees": round(separation, 2)},
     )
     return _Conjunction(separation, highlight)
+
+
+def _opposition(observed: list[_Observation], local_noon: datetime) -> VisibleBody | None:
+    """The first Visible superior Planet, in catalog order, within a night of its opposition.
+
+    The Planets inside Earth's orbit never reach opposition, so Mercury and Venus are never
+    considered.
+    """
+    for seen in observed:
+        if seen.body.object_type == "planet" and seen.catalog_body.key in _SUPERIOR_PLANETS:
+            moment = _opposition_moment(seen.catalog_body, local_noon)
+            if moment is not None:
+                return _opposition_highlight(seen, moment)
+    return None
+
+
+def _opposition_moment(body: CatalogBody, local_noon: datetime) -> Time | None:
+    """The exact moment of the Planet's opposition, if it falls within a night of this one.
+
+    A night runs from local noon to the next, so the nights either side of this one span the
+    three days from the previous local noon.
+    """
+    ephemeris = _ephemeris()
+    times, codes = almanac.find_discrete(
+        _timescale.from_datetime(local_noon - timedelta(days=1)),
+        _timescale.from_datetime(local_noon + timedelta(days=2)),
+        almanac.oppositions_conjunctions(ephemeris, ephemeris[body.target]),
+    )
+    return next(
+        (moment for moment, code in zip(times, codes, strict=True) if code == _OPPOSITION), None
+    )
+
+
+def _opposition_highlight(seen: _Observation, moment: Time) -> VisibleBody:
+    """The opposition's Highlight: the Planet itself, best seen at its Peak Altitude."""
+    planet = seen.body
+    return replace(
+        planet,
+        id=f"significant_event:opposition_{seen.catalog_body.key}",
+        category="featured",
+        object_type="significant_event",
+        name=f"{planet.name} at opposition",
+        event=SignificantEvent(
+            event_type="opposition",
+            peak_time=_to_utc(seen.peak_time),
+            related_object_names=(planet.name,),
+        ),
+        context={"opposition_time": _to_utc(moment).isoformat()},
+    )
 
 
 def _category_3_priority(seen: _Observation) -> tuple[float, float]:

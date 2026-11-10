@@ -75,6 +75,13 @@ far apart they appear at peak_time. The full Moon spans about half a degree, so 
 with it, in words. The two bodies only line up from our point of view; they are not really near
 each other, so never say they are close in space.
 
+An opposition (object_type "significant_event", event_type "opposition") is a planet, named in
+related_object_names, standing opposite the Sun in our sky. It rises around sunset, is up all
+night, and is about as close and as bright as it gets this year, its face fully lit. peak_time is
+when it stands highest tonight, and the positional fields describe the planet itself. context
+gives opposition_time, the exact moment of opposition, which may fall on a neighbouring night;
+say how near tonight is to it in words, such as "tonight" or "just last night".
+
 Banned phrases, which must never appear: {", ".join(f'"{phrase}"' for phrase in BANNED_PHRASES)}.
 
 Each card's id must be copied exactly from the Highlight it narrates. Only write about the
