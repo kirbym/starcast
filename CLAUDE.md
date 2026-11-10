@@ -14,6 +14,15 @@ The project uses Python. The .gitignore includes patterns for:
 - **Packaging**: uv / poetry / pdm (exact tool TBD once pyproject.toml exists)
 - **Linting**: Ruff
 
+## Git workflow
+
+Every session that changes code runs on a feature branch and lands through a PR. `main` takes changes only by merged PR, never by a direct commit.
+
+1. **Sync `main`**: `git switch main && git pull origin main`. Done when `main` matches `origin/main`. Exception: if the session starts on a feature branch for the same task, stay on that branch and skip to step 3.
+2. **Cut the feature branch** from the freshly pulled `main`, named `<short-slug>-<issue#>` (e.g. `detail-layer-21`), or just `<short-slug>` when there is no issue.
+3. **Do the work**, committing on the feature branch.
+4. **Open a PR** into `main` with `gh pr create --base main`, and reference the issue it resolves. Done when the PR URL is in your final report.
+
 ## Development Commands
 
 Settings for both deployables live in a root `.env` (copy `.env.example`).
