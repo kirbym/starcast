@@ -37,7 +37,7 @@ One of three fixed slots that structure Highlight selection: (1) Planet or Moon,
 _Avoid_: "slot", "type", "group"
 
 **Significant Event**:
-A time-sensitive astronomical occurrence detected for the current night: a conjunction (two eligible bodies within 2.0° of each other at their closest approach while both are above the horizon), a planetary opposition (a Visible superior Planet, Mars through Neptune, whose exact opposition falls on that night or a night either side, each night running from local noon to local noon), or a meteor shower within 2 days of its predicted peak with ZHR ≥ 20. A Significant Event takes priority over a standing catalog body when filling Category 3; if more than one qualifies the same night, only one is used, chosen by type: conjunction, then opposition, then meteor shower.
+A time-sensitive astronomical occurrence detected for the current night: a conjunction (two eligible bodies within 2.0° of each other at their closest approach while both are above the horizon), a planetary opposition (a Visible superior Planet, Mars through Neptune, whose exact opposition falls on that night or a night either side, each night running from local noon to local noon), or a meteor shower within 2 days of its predicted peak with ZHR ≥ 20. A Significant Event takes priority over a standing catalog body when filling Category 3; if more than one qualifies the same night, only one is used, chosen by event type: conjunction, then opposition, then meteor shower.
 _Avoid_: "special event", "astronomical event", "rare event"
 
 **Visual Priority**:

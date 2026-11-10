@@ -690,6 +690,12 @@ def test_dso_near_a_planet_never_makes_a_conjunction():
     assert category_3_highlight(sky).id == "dso:m45"
 
 
+def without_planets(*keys: str) -> Catalog:
+    """The real catalog, less the given Planets or Moon."""
+    planets = tuple(body for body in CATALOG.planets_and_moon if body.key not in keys)
+    return replace(CATALOG, planets_and_moon=planets)
+
+
 # Mars reached opposition at 23:26 UTC on 2020-10-13: the evening of the 13th in New York.
 MARS_OPPOSITION_NIGHT = date(2020, 10, 13)
 
@@ -711,7 +717,7 @@ def test_superior_planet_within_a_night_of_opposition_is_the_category_3_highligh
     assert opposition.name == "Mars at opposition"
     assert opposition.event.event_type == "opposition"
     assert opposition.event.related_object_names == ("Mars",)
-    # Where and when to look: Mars itself, at its highest tonight.
+    # Where and when to look: Mars itself, at its highest that night.
     mars = visible_body(sky, "planet:mars")
     assert opposition.peak_altitude_degrees == mars.peak_altitude_degrees
     assert opposition.azimuth_at_peak_degrees == mars.azimuth_at_peak_degrees
@@ -745,16 +751,16 @@ def test_inner_planet_is_never_at_opposition(key):
     # An inner planet never reaches opposition, but Skyfield's search reports some of its
     # conjunctions with the Sun as one. Such a night has it too near the Sun to be Visible, so
     # stand the inner planet where Mars is on Mars's opposition night to show it is never flagged.
+    catalog = without_planets("mars")
     planets = tuple(
         replace(body, target="mars barycenter") if body.key == key else body
-        for body in CATALOG.planets_and_moon
-        if body.key != "mars"
+        for body in catalog.planets_and_moon
     )
     sky = compute_night_sky(
         *NEW_YORK,
         "America/New_York",
         MARS_OPPOSITION_NIGHT,
-        replace(CATALOG, planets_and_moon=planets),
+        replace(catalog, planets_and_moon=planets),
     )
     assert f"planet:{key}" in visible_ids(sky)
 
@@ -762,14 +768,11 @@ def test_inner_planet_is_never_at_opposition(key):
 
 
 def test_planet_must_be_visible_to_be_at_opposition():
-    # Mars at opposition is up all night from New York. Left out of the catalog, it is not
-    # Visible, so its opposition is not an event.
-    planets = tuple(body for body in CATALOG.planets_and_moon if body.key != "mars")
+    # A planet at opposition stands opposite the Sun, so wherever the night is dark it is above
+    # the horizon for some of it. Leaving Mars out of the catalog is the way to make it not
+    # Visible on its opposition night; its opposition is then not an event.
     sky = compute_night_sky(
-        *NEW_YORK,
-        "America/New_York",
-        MARS_OPPOSITION_NIGHT,
-        replace(CATALOG, planets_and_moon=planets),
+        *NEW_YORK, "America/New_York", MARS_OPPOSITION_NIGHT, without_planets("mars")
     )
 
     assert significant_event(sky) is None
@@ -782,8 +785,7 @@ def test_conjunction_outranks_an_opposition_the_same_night():
 
     assert significant_event(sky).id == "significant_event:conjunction_mars_moon"
     # Without the Moon, the opposition stands.
-    planets = tuple(body for body in CATALOG.planets_and_moon if body.key != "moon")
     sky = compute_night_sky(
-        *NEW_YORK, "America/New_York", date(2022, 12, 7), replace(CATALOG, planets_and_moon=planets)
+        *NEW_YORK, "America/New_York", date(2022, 12, 7), without_planets("moon")
     )
     assert significant_event(sky).id == "significant_event:opposition_mars"

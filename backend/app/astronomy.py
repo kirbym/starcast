@@ -413,7 +413,8 @@ def _significant_event(
 ) -> VisibleBody | None:
     """The night's one Significant Event Highlight.
 
-    When several qualify, a fixed type priority decides: Conjunction > Opposition > Meteor shower.
+    When several qualify, a fixed event-type priority decides:
+    Conjunction > Opposition > Meteor shower.
     Each detector only runs when every type above it has found nothing.
     """
     return _tightest_conjunction(observed, samples) or _opposition(observed, local_noon)
@@ -520,7 +521,7 @@ def _opposition_moment(body: CatalogBody, local_noon: datetime) -> Time | None:
 
 
 def _opposition_highlight(seen: _Observation, moment: Time) -> VisibleBody:
-    """The opposition's Highlight: the Planet itself, best seen at its Peak Altitude tonight."""
+    """The opposition's Highlight: the Planet itself, best seen at its Peak Altitude."""
     planet = seen.body
     return replace(
         planet,
