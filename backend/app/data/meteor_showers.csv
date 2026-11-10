@@ -1,0 +1,22 @@
+# The 12 major annual meteor showers: the Significant Event shower calendar.
+# Source: IMO Meteor Shower Calendar 2026, ed. Jürgen Rendtel, International Meteor Organization
+#   (https://www.imo.net/files/meteor-shower/cal2026.pdf): activity windows, peak dates, ZHR,
+#   radiant positions at peak (J2000, degrees) and entry velocities.
+# Cross-checked: IAU Meteor Data Center, established showers list
+#   (https://www.ta3.sk/IAUC22DB/MDC2022/Etc/streamestablisheddata2026.txt) for IAU codes and numbers.
+# Hand-maintained, not generated: see docs/research/meteor-shower-calendar.md. Dates are MM-DD and
+# recur every year; peak_end is the second day of a two-day peak. hemisphere is the observer
+# hemisphere the shower favours (north or south), blank where it favours neither.
+key,name,iau_code,iau_number,active_start,active_end,peak,peak_end,zhr,zhr_note,velocity_kms,parent_body,radiant_constellation,radiant_ra_degrees,radiant_dec_degrees,hemisphere,hemisphere_note,daytime
+qua,Quadrantids,QUA,10,12-28,01-12,01-03,01-04,120,Very sharp peak (~6 hours FWHM); ZHR depends heavily on peak timing,41,Asteroid 2003 EH1,Boötes,230,49,north,Best from Northern Hemisphere,false
+lyr,April Lyrids,LYR,6,04-14,04-30,04-22,04-23,18,,49,C/1861 G1 (Thatcher),Lyra,271,34,,,false
+eta,Eta Aquariids,ETA,31,04-19,05-28,05-05,05-06,55,,66,1P/Halley,Aquarius,338,-1,south,Best from Southern Hemisphere and tropics; low from northern mid-latitudes,false
+ari,Daytime Arietids,ARI,171,05-14,06-24,06-07,,30,Radiant too close to the Sun to see the shower at night,38,Asteroid 1566 Icarus,Aries,44,24,,,true
+sda,Southern Delta Aquariids,SDA,5,07-12,08-23,07-30,07-31,25,,41,342P/SOHO,Aquarius,340,-16,south,Best from Southern Hemisphere,false
+cap,Alpha Capricornids,CAP,1,07-03,08-15,07-30,07-31,5,Produces occasional bright fireballs,23,169P/NEAT,Capricornus,307,-10,,,false
+per,Perseids,PER,7,07-17,08-24,08-12,08-13,100,Most popular shower of the year; broad peak (~2 days),59,109P/Swift-Tuttle,Perseus,48,58,north,Best from Northern Hemisphere,false
+dra,October Draconids,DRA,9,10-06,10-10,10-08,10-09,10,Storm potential in years of parent comet perihelion passage,20,21P/Giacobini-Zinner,Draco,262,54,north,Best from Northern Hemisphere,false
+ori,Orionids,ORI,8,10-02,11-07,10-21,10-22,20,,66,1P/Halley,Orion,95,16,,,false
+leo,Leonids,LEO,13,11-06,11-30,11-17,11-18,15,Storm potential (~1000+/hr) near 55P perihelion; next major storm ~2031-2032,71,55P/Tempel-Tuttle,Leo,152,22,,,false
+gem,Geminids,GEM,4,12-04,12-17,12-13,12-14,150,Strongest annual shower; parent is an asteroid not a comet,35,Asteroid 3200 Phaethon,Gemini,112,33,,,false
+urs,Ursids,URS,15,12-17,12-26,12-22,12-23,10,,33,8P/Tuttle,Ursa Minor,217,76,north,Best from Northern Hemisphere; radiant circumpolar above ~50°N,false

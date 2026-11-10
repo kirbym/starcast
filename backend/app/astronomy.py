@@ -43,6 +43,7 @@ ObjectType = Literal[
     "planet", "moon", "constellation", "bright_star", "comet", "dso", "significant_event"
 ]
 EventType = Literal["conjunction", "opposition", "meteor_shower"]
+Hemisphere = Literal["north", "south"]
 
 # The bodies that move against the stars. Only they can start a conjunction.
 _MOVING_TYPES = frozenset({"planet", "moon", "comet"})
@@ -50,6 +51,10 @@ _MOVING_TYPES = frozenset({"planet", "moon", "comet"})
 _SUPERIOR_PLANETS = frozenset({"mars", "jupiter", "saturn", "uranus", "neptune"})
 # Skyfield's almanac.oppositions_conjunctions() code for "opposite the Sun".
 _OPPOSITION = 1
+# A meteor shower is a Significant Event this many nights either side of its peak, at this ZHR or
+# more.
+SHOWER_PEAK_NIGHTS = 2
+SHOWER_ZHR_LIMIT = 20
 
 
 _CATEGORIES: dict[ObjectType, Category] = {
@@ -92,13 +97,51 @@ class CatalogBody:
 
 
 @dataclass(frozen=True)
+class MeteorShower:
+    """One annual meteor shower from the bundled calendar. Its dates recur every year."""
+
+    # The lower-case IAU code.
+    key: str
+    name: str
+    iau_code: str
+    iau_number: int
+    # (month, day) pairs. A window may wrap the new year, like the Quadrantids'.
+    active_start: tuple[int, int]
+    active_end: tuple[int, int]
+    peak_month: int
+    peak_day: int
+    # The second day of a two-day peak.
+    peak_day_end: int | None
+    zhr: int
+    zhr_note: str | None
+    velocity_kms: float
+    parent_body: str
+    radiant_constellation: str
+    # Where the meteors appear to stream from, at the peak.
+    radiant: Star
+    # The observer hemisphere the shower favours; None where it favours neither.
+    hemisphere: Hemisphere | None
+    hemisphere_note: str | None
+    # A daytime shower's radiant sits near the Sun, so it is never seen at night.
+    daytime: bool
+
+    def favours_other_hemisphere(self, latitude: float) -> bool:
+        """Whether the shower favours the hemisphere the observer is not in."""
+        return (self.hemisphere == "north" and latitude < 0) or (
+            self.hemisphere == "south" and latitude > 0
+        )
+
+
+@dataclass(frozen=True)
 class Catalog:
-    """Every In Catalog body, grouped by the Category whose Highlight it competes for."""
+    """Every In Catalog body, grouped by the Category whose Highlight it competes for, and the
+    meteor showers that can make a Significant Event."""
 
     planets_and_moon: tuple[CatalogBody, ...]
     constellations: tuple[CatalogBody, ...]
     # The standing Category 3 candidates: the Bright Stars, Named Comets and DSOs.
     featured: tuple[CatalogBody, ...]
+    meteor_showers: tuple[MeteorShower, ...]
 
 
 # DE440s carries Mars and the outer planets only as barycenters of their systems.
@@ -233,10 +276,60 @@ def _named_comets() -> tuple[CatalogBody, ...]:
     )
 
 
+def _load_meteor_showers() -> tuple[MeteorShower, ...]:
+    """The major annual meteor showers, from the IMO Meteor Shower Calendar.
+
+    The file is maintained by hand; see docs/research/meteor-shower-calendar.md.
+    """
+    return tuple(_meteor_shower(row) for row in _read_data_file("meteor_showers.csv"))
+
+
+def _meteor_shower(row: dict[str, str]) -> MeteorShower:
+    peak_month, peak_day = _month_day(row["peak"])
+    return MeteorShower(
+        key=row["key"],
+        name=row["name"],
+        iau_code=row["iau_code"],
+        iau_number=int(row["iau_number"]),
+        active_start=_month_day(row["active_start"]),
+        active_end=_month_day(row["active_end"]),
+        peak_month=peak_month,
+        peak_day=peak_day,
+        peak_day_end=_month_day(row["peak_end"])[1] if row["peak_end"] else None,
+        zhr=int(row["zhr"]),
+        zhr_note=row["zhr_note"] or None,
+        velocity_kms=float(row["velocity_kms"]),
+        parent_body=row["parent_body"],
+        radiant_constellation=row["radiant_constellation"],
+        radiant=Star(
+            ra_hours=float(row["radiant_ra_degrees"]) / 15,
+            dec_degrees=float(row["radiant_dec_degrees"]),
+        ),
+        hemisphere=_hemisphere(row["hemisphere"]),
+        hemisphere_note=row["hemisphere_note"] or None,
+        daytime=row["daytime"] == "true",
+    )
+
+
+def _month_day(value: str) -> tuple[int, int]:
+    """(1, 3) from "01-03"."""
+    month, day = value.split("-")
+    return int(month), int(day)
+
+
+def _hemisphere(value: str) -> Hemisphere | None:
+    if value == "north" or value == "south":
+        return value
+    if value:
+        raise ValueError(f"unknown hemisphere {value!r}")
+    return None
+
+
 CATALOG = Catalog(
     planets_and_moon=_SOLAR_SYSTEM,
     constellations=_load_constellations(),
     featured=_load_bright_stars() + _named_comets() + _load_dsos(),
+    meteor_showers=_load_meteor_showers(),
 )
 
 _DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / ".cache" / "skyfield"
@@ -254,8 +347,8 @@ class SignificantEvent:
     """What makes a Significant Event Highlight time-sensitive: what happens, and when."""
 
     event_type: EventType
-    # The moment the event is at its best: a conjunction's closest approach, or an opposition
-    # planet's Peak Altitude.
+    # The moment the event is at its best: a conjunction's closest approach, or the Peak Altitude
+    # of an opposition planet or a meteor shower's radiant.
     peak_time: datetime
     related_object_names: tuple[str, ...] | None
 
@@ -322,7 +415,8 @@ def compute_night_sky(
     featured = _observe_visible(catalog.featured, observer, samples, _comet_elements(catalog))
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
-    category_3 = _category_3_highlight(planets_and_moon + featured, samples, local_noon)
+    night = _Night(observer, latitude, local_noon, samples)
+    category_3 = _category_3_highlight(planets_and_moon + featured, night, catalog.meteor_showers)
     highlights = [seen.body for seen in (category_1, category_2) if seen]
     if category_3:
         highlights.append(category_3)
@@ -331,6 +425,16 @@ def compute_night_sky(
         highlights=highlights,
         visible_objects=[seen.body for seen in planets_and_moon + constellations + featured],
     )
+
+
+@dataclass(frozen=True)
+class _Night:
+    """Where the night is observed from, and when."""
+
+    observer: VectorFunction
+    latitude: float
+    local_noon: datetime
+    samples: Time
 
 
 @dataclass(frozen=True)
@@ -393,14 +497,14 @@ def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
 
 
 def _category_3_highlight(
-    observed: list[_Observation], samples: Time, local_noon: datetime
+    observed: list[_Observation], night: _Night, showers: tuple[MeteorShower, ...]
 ) -> VisibleBody | None:
     """Category 3: a Significant Event wins outright; otherwise the best standing body.
 
     `observed` is every Visible body of the night outside Category 2. The standing candidates
     among them are the featured ones: the Bright Stars, Named Comets and DSOs.
     """
-    event = _significant_event(observed, samples, local_noon)
+    event = _significant_event(observed, night, showers)
     if event:
         return event
     standing = [seen for seen in observed if seen.body.category == "featured"]
@@ -409,7 +513,7 @@ def _category_3_highlight(
 
 
 def _significant_event(
-    observed: list[_Observation], samples: Time, local_noon: datetime
+    observed: list[_Observation], night: _Night, showers: tuple[MeteorShower, ...]
 ) -> VisibleBody | None:
     """The night's one Significant Event Highlight.
 
@@ -417,7 +521,11 @@ def _significant_event(
     Conjunction > Opposition > Meteor shower.
     Each detector only runs when every type above it has found nothing.
     """
-    return _tightest_conjunction(observed, samples) or _opposition(observed, local_noon)
+    return (
+        _tightest_conjunction(observed, night.samples)
+        or _opposition(observed, night.local_noon)
+        or _strongest_meteor_shower(showers, night)
+    )
 
 
 def _tightest_conjunction(observed: list[_Observation], samples: Time) -> VisibleBody | None:
@@ -535,6 +643,82 @@ def _opposition_highlight(seen: _Observation, moment: Time) -> VisibleBody:
             related_object_names=(planet.name,),
         ),
         context={"opposition_time": _to_utc(moment).isoformat()},
+    )
+
+
+def _strongest_meteor_shower(
+    showers: tuple[MeteorShower, ...], night: _Night
+) -> VisibleBody | None:
+    """The qualifying meteor shower with the highest ZHR whose radiant clears the horizon during the
+    Viewing Window."""
+    night_date = night.local_noon.date()
+    qualifying = [
+        shower for shower in showers if _shower_qualifies(shower, night_date, night.latitude)
+    ]
+    for shower in sorted(qualifying, key=lambda shower: shower.zhr, reverse=True):
+        highlight = _meteor_shower_highlight(shower, night)
+        if highlight:
+            return highlight
+    return None
+
+
+def _shower_qualifies(shower: MeteorShower, night_date: date, latitude: float) -> bool:
+    """Whether the shower is strong enough and near enough its peak, seen from this hemisphere.
+
+    A daytime shower never qualifies, and neither does one that favours the other hemisphere.
+    """
+    days_from_peak = abs((_nearest_peak(shower, night_date) - night_date).days)
+    return (
+        not shower.daytime
+        and not shower.favours_other_hemisphere(latitude)
+        and shower.zhr >= SHOWER_ZHR_LIMIT
+        and days_from_peak <= SHOWER_PEAK_NIGHTS
+    )
+
+
+def _nearest_peak(shower: MeteorShower, night_date: date) -> date:
+    """The shower's peak date nearest the night's, which may fall in the previous or next year."""
+    peaks = (
+        date(year, shower.peak_month, shower.peak_day)
+        for year in (night_date.year - 1, night_date.year, night_date.year + 1)
+    )
+    return min(peaks, key=lambda peak: abs(peak - night_date))
+
+
+def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> VisibleBody | None:
+    """The shower's Highlight, placed at its radiant, or None if the radiant never rises tonight.
+
+    Meteors stream from the radiant, and the higher it stands the more of them are seen, so the
+    shower is at its best at the radiant's Peak Altitude.
+    """
+    track = _track(night.observer, shower.radiant, night.samples)
+    peak = _peak(track, night.samples)
+    if peak is None:
+        return None
+    context: dict[str, str | float] = {
+        "zhr": shower.zhr,
+        "peak_date": _nearest_peak(shower, night.local_noon.date()).isoformat(),
+        "velocity_kms": shower.velocity_kms,
+        "parent_body": shower.parent_body,
+    }
+    if shower.zhr_note:
+        context["zhr_note"] = shower.zhr_note
+    return VisibleBody(
+        id=f"significant_event:meteor_shower_{shower.key}",
+        category="featured",
+        object_type="significant_event",
+        name=f"{shower.name} meteor shower",
+        peak_altitude_degrees=peak.altitude_degrees,
+        azimuth_at_peak_degrees=peak.azimuth_degrees,
+        rises_at=_rising_before(night.observer, shower.radiant, peak.time),
+        sets_at=_setting_after(night.observer, shower.radiant, peak.time),
+        magnitude=None,
+        event=SignificantEvent(
+            event_type="meteor_shower",
+            peak_time=_to_utc(peak.time),
+            related_object_names=(shower.radiant_constellation,),
+        ),
+        context=context,
     )
 
 

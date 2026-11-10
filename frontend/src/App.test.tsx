@@ -724,6 +724,58 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
   expect(details).toHaveTextContent('Peak9:55 PM')
 })
 
+const PERSEIDS = {
+  id: 'significant_event:meteor_shower_per',
+  category: 'featured',
+  object_type: 'significant_event',
+  name: 'Perseids meteor shower',
+  peak_altitude_degrees: 71.4,
+  azimuth_at_peak_degrees: 32.8,
+  rises_at: null,
+  sets_at: null,
+  magnitude: null,
+  event: {
+    event_type: 'meteor_shower',
+    // Shown in the browser's time zone: 1:20 AM in Los Angeles, where the tests run.
+    peak_time: '2026-08-13T08:20:00Z',
+    related_object_names: ['Perseus'],
+  },
+}
+
+test('shows a meteor shower Highlight Card whose Detail Layer names the event, its radiant and peak time', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'The Perseids rain down tonight.',
+        highlights: [
+          {
+            ...PERSEIDS,
+            mini_headline: 'Perseids at their peak',
+            paragraph: 'Swift streaks fly out of Perseus all night.',
+          },
+        ],
+        visible_objects: [],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'Perseids at their peak' })
+  fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
+
+  const details = within(card).getByRole('region', { name: 'Details' })
+  expect(details).toHaveTextContent('EventMeteor shower')
+  expect(details).toHaveTextContent('RadiantPerseus')
+  expect(details).toHaveTextContent('Peak1:20 AM')
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({
