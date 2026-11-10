@@ -23,9 +23,19 @@ export function Azimuth({ degrees }: { degrees: number }) {
   return <>{`${Math.round(degrees) % 360}° ${point}`}</>
 }
 
-/** "-2.0": magnitude to a tenth, or "-" when the body has none (a constellation). */
+/** "−2.0": magnitude to a tenth, signed with a true minus (U+2212) so it lines up with the digits.
+ * A body with no magnitude (a constellation) gets an em dash, which can't be mistaken for a minus,
+ * labelled so a screen reader says what it means (a plain span can't carry a label, so it is an
+ * image of a word). */
 export function Magnitude({ magnitude }: { magnitude: number | null }) {
-  return <>{magnitude === null ? '-' : magnitude.toFixed(1)}</>
+  if (magnitude === null) {
+    return (
+      <span role="img" aria-label="No magnitude">
+        —
+      </span>
+    )
+  }
+  return <>{magnitude.toFixed(1).replace('-', '−')}</>
 }
 
 /** A rise time, or that the body is already up and doesn't rise during the Viewing Window. */

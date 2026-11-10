@@ -481,7 +481,7 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
     'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
   )
   expect(screen.getAllByRole('article')).toHaveLength(1)
-  for (const number of ['54.8', '55°', '132', '-2.0', '8:51', '10:30']) {
+  for (const number of ['54.8', '55°', '132', '−2.0', '8:51', '10:30']) {
     expect(document.body).not.toHaveTextContent(number)
   }
 })
@@ -865,7 +865,8 @@ test("expands a Highlight Card's Detail Layer to show its positional fields in l
   // 04:51 and 18:30 UTC, in Los Angeles where the tests run.
   expect(details).toHaveTextContent('Rises8:51 PM')
   expect(details).toHaveTextContent('Sets10:30 AM')
-  expect(details).toHaveTextContent('Magnitude-2.0')
+  // A true minus sign, not a hyphen.
+  expect(details).toHaveTextContent('Magnitude−2.0')
 
   fireEvent.click(toggle)
 
@@ -908,7 +909,8 @@ test('says a body does not rise or set tonight when those times are null, and da
   expect(details).toHaveTextContent("RisesDoesn't rise tonight")
   expect(details).toHaveTextContent("SetsDoesn't set tonight")
   expect(details).not.toHaveTextContent(/\d:\d\d/)
-  expect(detailsOf(andromeda)).toHaveTextContent(/Magnitude-$/)
+  expect(detailsOf(andromeda)).toHaveTextContent(/Magnitude—$/)
+  expect(within(andromeda).getByLabelText('No magnitude')).toHaveTextContent('—')
 })
 
 test('lists every Visible object not on a card once, in a shared section below the cards', async () => {
@@ -930,9 +932,9 @@ test('lists every Visible object not on a card once, in a shared section below t
     'Moon',
     'Cassiopeia',
   ])
-  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM-11.2')
-  expect(rows[1]).toHaveTextContent("82°2° NDoesn't rise tonightDoesn't set tonight-")
-  expect(rows[1].lastElementChild).toHaveTextContent(/^-$/)
+  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM−11.2')
+  expect(rows[1]).toHaveTextContent("82°2° NDoesn't rise tonightDoesn't set tonight—")
+  expect(within(rows[1]).getByLabelText('No magnitude')).toHaveTextContent(/^—$/)
   expect(screen.getAllByRole('table')).toHaveLength(1)
 
   fireEvent.click(within(section).getByRole('button', { name: 'Hide' }))
