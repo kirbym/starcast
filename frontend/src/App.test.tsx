@@ -481,7 +481,7 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
     'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
   )
   expect(screen.getAllByRole('article')).toHaveLength(1)
-  for (const number of ['54.8', '132.2', '-2.03', '04:51', '18:30']) {
+  for (const number of ['54.8', '55°', '132', '-2.0', '8:51', '10:30']) {
     expect(document.body).not.toHaveTextContent(number)
   }
 })
@@ -786,6 +786,161 @@ test('shows no Highlight Cards on a Quiet Night', async () => {
 
   renderApp()
 
-  await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
+  const headline = await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
   expect(screen.queryByRole('article')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('region', { name: 'Visible tonight' }),
+  ).not.toBeInTheDocument()
+  // Only the Headline: no empty card list, no Viewing Window, no error styling.
+  expect(headline.parentElement?.children).toHaveLength(1)
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(document.body).not.toHaveTextContent('6:30 PM')
+})
+
+function geolocateToNewYork() {
+  geolocateTo(40.72, -74.0)
+}
+
+function respondWith(report: object) {
+  server.use(http.post(REPORT_URL, () => HttpResponse.json(report)))
+}
+
+const POLARIS = {
+  id: 'bright_star:polaris',
+  category: 'featured',
+  object_type: 'bright_star',
+  name: 'Polaris',
+  peak_altitude_degrees: 41.3,
+  azimuth_at_peak_degrees: 0.4,
+  // Circumpolar: it neither rises nor sets tonight.
+  rises_at: null,
+  sets_at: null,
+  magnitude: 1.98,
+  event: null,
+}
+
+const THREE_CARD_NIGHT = {
+  ...QUIET_NIGHT,
+  headline: 'Jupiter, Andromeda and Polaris share the sky.',
+  highlights: [
+    { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
+    { ...ANDROMEDA, mini_headline: 'The chained princess overhead', paragraph: 'Andromeda sails.' },
+    { ...POLARIS, mini_headline: 'The pole star holds still', paragraph: 'Polaris waits.' },
+  ],
+  visible_objects: [
+    JUPITER,
+    { ...JUPITER, id: 'moon:moon', object_type: 'moon', name: 'Moon', magnitude: -11.2 },
+    ANDROMEDA,
+    POLARIS,
+  ],
+}
+
+function detailsOf(card: HTMLElement) {
+  return within(card).queryByRole('region', { name: 'Details' })
+}
+
+test("expands a Highlight Card's Detail Layer to show its positional fields in local time", async () => {
+  geolocateToNewYork()
+  respondWith(THREE_CARD_NIGHT)
+  renderApp()
+  const card = await screen.findByRole('article', { name: 'The king climbs the east' })
+  const toggle = within(card).getByRole('button', { name: 'Details' })
+  expect(detailsOf(card)).not.toBeInTheDocument()
+
+  fireEvent.click(toggle)
+
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const details = detailsOf(card)
+  expect(details).toHaveTextContent('Peak altitude55°')
+  expect(details).toHaveTextContent('Direction at peak132° SE')
+  // 04:51 and 18:30 UTC, in Los Angeles where the tests run.
+  expect(details).toHaveTextContent('Rises8:51 PM')
+  expect(details).toHaveTextContent('Sets10:30 AM')
+  expect(details).toHaveTextContent('Magnitude-2.0')
+
+  fireEvent.click(toggle)
+
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  expect(detailsOf(card)).not.toBeInTheDocument()
+})
+
+test('expands each Highlight Card independently', async () => {
+  geolocateToNewYork()
+  respondWith(THREE_CARD_NIGHT)
+  renderApp()
+  const jupiter = await screen.findByRole('article', { name: 'The king climbs the east' })
+  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead' })
+  const polaris = screen.getByRole('article', { name: 'The pole star holds still' })
+
+  fireEvent.click(within(jupiter).getByRole('button', { name: 'Details' }))
+  fireEvent.click(within(andromeda).getByRole('button', { name: 'Details' }))
+
+  expect(detailsOf(jupiter)).toBeInTheDocument()
+  expect(detailsOf(andromeda)).toHaveTextContent('Peak altitude90°')
+  expect(detailsOf(polaris)).not.toBeInTheDocument()
+
+  fireEvent.click(within(jupiter).getByRole('button', { name: 'Details' }))
+
+  expect(detailsOf(jupiter)).not.toBeInTheDocument()
+  expect(detailsOf(andromeda)).toBeInTheDocument()
+})
+
+test('says a body does not rise or set tonight when those times are null, and omits a missing magnitude', async () => {
+  geolocateToNewYork()
+  respondWith(THREE_CARD_NIGHT)
+  renderApp()
+  const polaris = await screen.findByRole('article', { name: 'The pole star holds still' })
+  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead' })
+
+  fireEvent.click(within(polaris).getByRole('button', { name: 'Details' }))
+  fireEvent.click(within(andromeda).getByRole('button', { name: 'Details' }))
+
+  const details = detailsOf(polaris)
+  expect(details).toHaveTextContent("RisesDoesn't rise tonight")
+  expect(details).toHaveTextContent("SetsDoesn't set tonight")
+  expect(details).not.toHaveTextContent(/\d:\d\d/)
+  expect(detailsOf(andromeda)).not.toHaveTextContent('Magnitude')
+})
+
+test('lists every Visible object once in a shared section below the cards', async () => {
+  geolocateToNewYork()
+  respondWith(THREE_CARD_NIGHT)
+  renderApp()
+  const section = await screen.findByRole('region', { name: 'Visible tonight' })
+  const cards = screen.getAllByRole('article')
+  expect(
+    cards.at(-1)!.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  expect(within(section).queryByRole('table')).not.toBeInTheDocument()
+
+  fireEvent.click(within(section).getByRole('button', { name: 'Show all 4' }))
+
+  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
+  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
+    'Jupiter',
+    'Moon',
+    'Andromeda',
+    'Polaris',
+  ])
+  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM-2.0')
+  expect(rows[3]).toHaveTextContent("41°0° NDoesn't rise tonightDoesn't set tonight2.0")
+  expect(screen.getAllByRole('table')).toHaveLength(1)
+
+  fireEvent.click(within(section).getByRole('button', { name: 'Hide' }))
+  expect(within(section).queryByRole('table')).not.toBeInTheDocument()
+})
+
+test("shows the Viewing Window's start and end in local time", async () => {
+  geolocateToNewYork()
+  respondWith(THREE_CARD_NIGHT)
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Visible tonight' })
+
+  // 02:30 and 13:10 UTC, in Los Angeles where the tests run.
+  expect(section).toHaveTextContent('Dark from 6:30 PM to 5:10 AM')
+  expect(within(section).getByText('6:30 PM')).toHaveAttribute(
+    'datetime',
+    QUIET_NIGHT.viewing_window.starts_at,
+  )
 })
