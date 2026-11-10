@@ -609,6 +609,69 @@ test('shows up to three Highlight Cards, one per Category, in Category order', a
   }
 })
 
+const GREAT_CONJUNCTION = {
+  id: 'significant_event:conjunction_jupiter_saturn',
+  category: 'featured',
+  object_type: 'significant_event',
+  name: 'Jupiter and Saturn in conjunction',
+  peak_altitude_degrees: 6.1,
+  azimuth_at_peak_degrees: 234.6,
+  rises_at: '2020-12-21T15:31:07Z',
+  sets_at: '2020-12-22T00:16:54Z',
+  magnitude: null,
+  event: {
+    event_type: 'conjunction',
+    // 3:11 PM in Los Angeles, where the tests run.
+    peak_time: '2020-12-21T23:11:00Z',
+    related_object_names: ['Jupiter', 'Saturn'],
+  },
+}
+
+test('shows a Significant Event card whose Detail Layer names its bodies and peak time', async () => {
+  fakeGeolocation((success) =>
+    success({
+      coords: { latitude: 40.72, longitude: -74.0 },
+    } as GeolocationPosition),
+  )
+  server.use(
+    http.post(REPORT_URL, () =>
+      HttpResponse.json({
+        ...QUIET_NIGHT,
+        headline: 'Jupiter and Saturn all but touch at dusk.',
+        highlights: [
+          {
+            ...GREAT_CONJUNCTION,
+            mini_headline: 'The great conjunction',
+            paragraph: 'Jupiter and Saturn sink together in the south-west, nearly one light.',
+          },
+        ],
+        visible_objects: [],
+      }),
+    ),
+  )
+
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'The great conjunction' })
+  expect(card).toHaveTextContent(
+    'Jupiter and Saturn sink together in the south-west, nearly one light.',
+  )
+  expect(card).not.toHaveTextContent('3:11')
+
+  const toggle = within(card).getByRole('button', { name: 'Details' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(toggle)
+
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  const details = within(card).getByRole('region', { name: 'Details' })
+  expect(details).toHaveTextContent('Jupiter and Saturn')
+  expect(details).toHaveTextContent('3:11 PM')
+
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  expect(within(card).queryByRole('region')).not.toBeInTheDocument()
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({

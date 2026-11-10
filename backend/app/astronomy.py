@@ -12,12 +12,14 @@ from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo
 
+import numpy as np
 from skyfield import almanac
 from skyfield.api import Loader, Star, load, wgs84
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 from skyfield.jpllib import SpiceKernel
 from skyfield.magnitudelib import planetary_magnitude
+from skyfield.positionlib import Apparent
 from skyfield.timelib import Time
 from skyfield.toposlib import GeographicPosition
 from skyfield.vectorlib import VectorFunction
@@ -33,11 +35,17 @@ _MINUTES_IN_SEARCH = 24 * 60 + 1
 _SAMPLE_SPACING = timedelta(minutes=5)
 # A Named Comet fainter than this, the naked-eye limit, is not Visible however high it climbs.
 COMET_MAGNITUDE_LIMIT = 6.0
+# Two bodies at most this far apart, both Visible at that moment, are in conjunction.
+CONJUNCTION_LIMIT_DEGREES = 2.0
 
 Category = Literal["planet_moon", "constellation", "featured"]
 ObjectType = Literal[
     "planet", "moon", "constellation", "bright_star", "comet", "dso", "significant_event"
 ]
+EventType = Literal["conjunction", "opposition", "meteor_shower"]
+
+# The bodies that move against the stars. Only they can start a conjunction.
+_MOVING_TYPES = frozenset({"planet", "moon", "comet"})
 
 
 _CATEGORIES: dict[ObjectType, Category] = {
@@ -238,8 +246,22 @@ class ViewingWindow:
 
 
 @dataclass(frozen=True)
+class SignificantEvent:
+    """What makes a Significant Event Highlight time-sensitive: what happens, and when."""
+
+    event_type: EventType
+    # The moment the event is at its best, such as a conjunction's closest approach.
+    peak_time: datetime
+    related_object_names: tuple[str, ...] | None
+
+
+@dataclass(frozen=True)
 class VisibleBody:
-    """A catalog body that is Visible tonight, with its positional fields for the Detail Layer."""
+    """A catalog body that is Visible tonight, with its positional fields for the Detail Layer.
+
+    A Significant Event Highlight has the same shape, with `event` set. Its positional fields say
+    where and when to look for the event.
+    """
 
     id: str
     category: Category
@@ -250,7 +272,7 @@ class VisibleBody:
     rises_at: datetime | None
     sets_at: datetime | None
     magnitude: float | None
-    event: None = None
+    event: SignificantEvent | None = None
     # Narration-only facts from the catalog; not part of the API's positional fields.
     context: NarrationContext | None = None
 
@@ -295,18 +317,30 @@ def compute_night_sky(
     featured = _observe_visible(catalog.featured, observer, samples, _comet_elements(catalog))
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
-    category_3 = _category_3_highlight(featured)
+    category_3 = _category_3_highlight(planets_and_moon + featured, samples)
     return NightSky(
         viewing_window=window,
-        highlights=[seen.body for seen in (category_1, category_2, category_3) if seen],
+        highlights=[seen.body for seen in (category_1, category_2) if seen]
+        + ([category_3] if category_3 else []),
         visible_objects=[seen.body for seen in planets_and_moon + constellations + featured],
     )
 
 
 @dataclass(frozen=True)
+class _Track:
+    """Where a body stands at each of the night's sample times."""
+
+    positions: Apparent
+    altitudes_degrees: np.ndarray
+    azimuths_degrees: np.ndarray
+
+
+@dataclass(frozen=True)
 class _Observation:
+    catalog_body: CatalogBody
     body: VisibleBody
     peak_time: Time
+    track: _Track
 
 
 def _observe_visible(
@@ -351,12 +385,87 @@ def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
     return named_comet_elements(data_dir())
 
 
-def _category_3_highlight(standing: list[_Observation]) -> _Observation | None:
-    """Category 3: a Significant Event would win outright; otherwise the best standing body.
+def _category_3_highlight(observed: list[_Observation], samples: Time) -> VisibleBody | None:
+    """Category 3: a Significant Event wins outright; otherwise the best standing body.
 
-    No Significant Event is detected yet. When one is, it is returned ahead of the ranking.
+    `observed` is every Visible body of the night outside Category 2. The standing candidates
+    among them are the featured ones: the Bright Stars, Named Comets and DSOs.
     """
-    return max(standing, key=_category_3_priority, default=None)
+    event = _significant_event(observed, samples)
+    if event:
+        return event
+    standing = [seen for seen in observed if seen.body.category == "featured"]
+    best = max(standing, key=_category_3_priority, default=None)
+    return best.body if best else None
+
+
+def _significant_event(observed: list[_Observation], samples: Time) -> VisibleBody | None:
+    """The night's one Significant Event Highlight: for now, its tightest conjunction."""
+    tightest = min(
+        _conjunctions(observed, samples), key=lambda found: found.separation_degrees, default=None
+    )
+    return tightest.highlight if tightest else None
+
+
+@dataclass(frozen=True)
+class _Conjunction:
+    separation_degrees: float
+    highlight: VisibleBody
+
+
+def _conjunctions(observed: list[_Observation], samples: Time) -> list[_Conjunction]:
+    """Every conjunction of the night, between a moving body and another moving body or a Bright
+    Star. DSOs never take part.
+
+    Only Visible bodies are given, so a Named Comet too faint to see never takes part either.
+    """
+    moving = [seen for seen in observed if seen.body.object_type in _MOVING_TYPES]
+    stars = [seen for seen in observed if seen.body.object_type == "bright_star"]
+    partners = moving + stars
+    found = []
+    for index, first in enumerate(moving):
+        # Each pair once: the moving bodies after this one, then every Bright Star.
+        for second in partners[index + 1 :]:
+            conjunction = _conjunction(first, second, samples)
+            if conjunction:
+                found.append(conjunction)
+    return found
+
+
+def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _Conjunction | None:
+    """The pair's conjunction, or None if they never come close enough while both are Visible.
+
+    Closest approach is the closest sample at which both bodies are above the horizon, so a pair
+    that draws closer still after one has set is caught while it can be seen.
+    """
+    both_up = (first.track.altitudes_degrees > 0) & (second.track.altitudes_degrees > 0)
+    separations = first.track.positions.separation_from(second.track.positions).degrees
+    separations = np.where(both_up, separations, np.inf)
+    closest = int(separations.argmin())
+    separation = float(separations[closest])
+    if separation > CONJUNCTION_LIMIT_DEGREES:
+        return None
+    pair = (first.body, second.body)
+    highlight = VisibleBody(
+        id=f"significant_event:conjunction_{first.catalog_body.key}_{second.catalog_body.key}",
+        category="featured",
+        object_type="significant_event",
+        name=f"{first.body.name} and {second.body.name} in conjunction",
+        # The pair stands within a couple of degrees of the first body: look there.
+        peak_altitude_degrees=float(first.track.altitudes_degrees[closest]),
+        azimuth_at_peak_degrees=float(first.track.azimuths_degrees[closest]),
+        # The span over which both bodies are up together.
+        rises_at=max((body.rises_at for body in pair if body.rises_at), default=None),
+        sets_at=min((body.sets_at for body in pair if body.sets_at), default=None),
+        magnitude=None,
+        event=SignificantEvent(
+            event_type="conjunction",
+            peak_time=_to_utc(samples[closest]),
+            related_object_names=(first.body.name, second.body.name),
+        ),
+        context={"separation_degrees": round(separation, 2)},
+    )
+    return _Conjunction(separation, highlight)
 
 
 def _category_3_priority(seen: _Observation) -> tuple[float, float]:
@@ -401,11 +510,13 @@ def _sample_times(window: ViewingWindow) -> Time:
 def _observe(body: CatalogBody, observer, samples: Time) -> _Observation | None:
     """Position one body over the night, or None if it never clears the horizon."""
     target = body.target if body.is_fixed else _ephemeris()[body.target]
-    peak = _peak(observer, target, samples)
+    track = _track(observer, target, samples)
+    peak = _peak(track, samples)
     if peak is None:
         return None
     magnitude = _magnitude(body, observer, target, peak.time)
-    return _Observation(_visible_body(body, observer, target, peak, magnitude), peak.time)
+    visible = _visible_body(body, observer, target, peak, magnitude)
+    return _Observation(body, visible, peak.time, track)
 
 
 def _observe_comet(
@@ -418,7 +529,8 @@ def _observe_comet(
     # MPC comet orbits are centred on the Sun, not on the Solar System's barycenter.
     orbit = mpc.comet_orbit(elements, _timescale, GM_SUN)
     target = _ephemeris()["sun"] + orbit
-    peak = _peak(observer, target, samples)
+    track = _track(observer, target, samples)
+    peak = _peak(track, samples)
     if peak is None:
         return None
     magnitude = _comet_magnitude(elements, orbit, observer, target, peak.time)
@@ -427,7 +539,7 @@ def _observe_comet(
         return None
     visible = _visible_body(body, observer, target, peak, magnitude)
     context = {**(body.context or {}), "perihelion_date": _perihelion_date(elements)}
-    return _Observation(replace(visible, context=context), peak.time)
+    return _Observation(body, replace(visible, context=context), peak.time, track)
 
 
 @dataclass(frozen=True)
@@ -439,13 +551,23 @@ class _Peak:
     azimuth_degrees: float
 
 
-def _peak(observer, target, samples: Time) -> _Peak | None:
+def _track(observer, target, samples: Time) -> _Track:
+    """Where the body stands at each sample time."""
+    positions = observer.at(samples).observe(target).apparent()
+    altitudes, azimuths, _ = positions.altaz()
+    return _Track(positions, altitudes.degrees, azimuths.degrees)
+
+
+def _peak(track: _Track, samples: Time) -> _Peak | None:
     """Where the body stands at its highest sample, or None if it never clears the horizon."""
-    altitudes, azimuths, _ = observer.at(samples).observe(target).apparent().altaz()
-    peak = int(altitudes.degrees.argmax())
-    if altitudes.degrees[peak] <= 0:
+    peak = int(track.altitudes_degrees.argmax())
+    if track.altitudes_degrees[peak] <= 0:
         return None
-    return _Peak(samples[peak], float(altitudes.degrees[peak]), float(azimuths.degrees[peak]))
+    return _Peak(
+        samples[peak],
+        float(track.altitudes_degrees[peak]),
+        float(track.azimuths_degrees[peak]),
+    )
 
 
 def _visible_body(

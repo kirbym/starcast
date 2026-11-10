@@ -68,6 +68,13 @@ Events: when a Highlight's event field is not null, centre its paragraph on the 
 meaning what is happening between the bodies or the peak of the shower, rather than describing
 the object as if the event were not occurring.
 
+A conjunction (object_type "significant_event", event_type "conjunction") is two bodies, named in
+related_object_names, appearing close together in the sky. peak_time is when they look closest,
+and the positional fields say where the pair stands then. context gives separation_degrees, how
+far apart they appear at peak_time. The full Moon spans about half a degree, so compare the gap
+with it, in words. The two bodies only line up from our point of view; they are not really near
+each other, so never say they are close in space.
+
 Banned phrases, which must never appear: {", ".join(f'"{phrase}"' for phrase in BANNED_PHRASES)}.
 
 Each card's id must be copied exactly from the Highlight it narrates. Only write about the
