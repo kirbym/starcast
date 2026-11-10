@@ -621,13 +621,13 @@ const GREAT_CONJUNCTION = {
   magnitude: null,
   event: {
     event_type: 'conjunction',
-    // 3:11 PM in Los Angeles, where the tests run.
+    // Shown in the browser's time zone: 3:11 PM in Los Angeles, where the tests run.
     peak_time: '2020-12-21T23:11:00Z',
     related_object_names: ['Jupiter', 'Saturn'],
   },
 }
 
-test('shows a Significant Event card whose Detail Layer names its bodies and peak time', async () => {
+test('shows a Significant Event Highlight Card whose Detail Layer names its bodies and peak time', async () => {
   fakeGeolocation((success) =>
     success({
       coords: { latitude: 40.72, longitude: -74.0 },

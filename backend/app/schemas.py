@@ -38,7 +38,7 @@ class ReportRequest(BaseModel):
     location_label: str | None = None
 
 
-class Event(BaseModel):
+class SignificantEvent(BaseModel):
     """A Significant Event Highlight's event: what happens, at its best when, and between what."""
 
     model_config = ConfigDict(from_attributes=True)
@@ -62,7 +62,7 @@ class SkyObject(BaseModel):
     rises_at: dt.datetime | None
     sets_at: dt.datetime | None
     magnitude: float | None
-    event: Event | None
+    event: SignificantEvent | None
 
 
 class Highlight(SkyObject):

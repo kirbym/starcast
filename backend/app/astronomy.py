@@ -35,7 +35,7 @@ _MINUTES_IN_SEARCH = 24 * 60 + 1
 _SAMPLE_SPACING = timedelta(minutes=5)
 # A Named Comet fainter than this, the naked-eye limit, is not Visible however high it climbs.
 COMET_MAGNITUDE_LIMIT = 6.0
-# Two bodies at most this far apart, both Visible at that moment, are in conjunction.
+# Two bodies at most this far apart, both above the horizon at that moment, are in conjunction.
 CONJUNCTION_LIMIT_DEGREES = 2.0
 
 Category = Literal["planet_moon", "constellation", "featured"]
@@ -257,7 +257,7 @@ class SignificantEvent:
 
 @dataclass(frozen=True)
 class VisibleBody:
-    """A catalog body that is Visible tonight, with its positional fields for the Detail Layer.
+    """A catalog body that is Visible on the night, with its positional fields for the Detail Layer.
 
     A Significant Event Highlight has the same shape, with `event` set. Its positional fields say
     where and when to look for the event.
@@ -318,10 +318,12 @@ def compute_night_sky(
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
     category_3 = _category_3_highlight(planets_and_moon + featured, samples)
+    highlights = [seen.body for seen in (category_1, category_2) if seen]
+    if category_3:
+        highlights.append(category_3)
     return NightSky(
         viewing_window=window,
-        highlights=[seen.body for seen in (category_1, category_2) if seen]
-        + ([category_3] if category_3 else []),
+        highlights=highlights,
         visible_objects=[seen.body for seen in planets_and_moon + constellations + featured],
     )
 
@@ -420,8 +422,8 @@ def _conjunctions(observed: list[_Observation], samples: Time) -> list[_Conjunct
     Only Visible bodies are given, so a Named Comet too faint to see never takes part either.
     """
     moving = [seen for seen in observed if seen.body.object_type in _MOVING_TYPES]
-    stars = [seen for seen in observed if seen.body.object_type == "bright_star"]
-    partners = moving + stars
+    bright_stars = [seen for seen in observed if seen.body.object_type == "bright_star"]
+    partners = moving + bright_stars
     found = []
     for index, first in enumerate(moving):
         # Each pair once: the moving bodies after this one, then every Bright Star.
@@ -433,7 +435,7 @@ def _conjunctions(observed: list[_Observation], samples: Time) -> list[_Conjunct
 
 
 def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _Conjunction | None:
-    """The pair's conjunction, or None if they never come close enough while both are Visible.
+    """The pair's conjunction, or None if they never come close enough while both are up.
 
     Closest approach is the closest sample at which both bodies are above the horizon, so a pair
     that draws closer still after one has set is caught while it can be seen.

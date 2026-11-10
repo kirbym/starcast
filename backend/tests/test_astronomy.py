@@ -678,7 +678,8 @@ def test_tightest_of_two_conjunctions_is_the_category_3_highlight():
 
 def test_dso_near_a_planet_never_makes_a_conjunction():
     # 2020-04-03 from New York: Venus passes a quarter of a degree from the Pleiades (M45), high
-    # in the west after dusk. DSOs never take part in a conjunction.
+    # in the west after dusk. DSOs never take part in a conjunction: if they did, the pair would
+    # be a Significant Event and win Category 3 over the Pleiades as a standing body.
     sky = compute_night_sky(
         *NEW_YORK, "America/New_York", date(2020, 4, 3), only_featured("dso:m45")
     )

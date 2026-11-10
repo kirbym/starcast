@@ -31,13 +31,14 @@ function HighlightCard({ highlight }: { highlight: Highlight }) {
     <article className="highlight-card" aria-labelledby={headingId}>
       <h2 id={headingId}>{highlight.mini_headline}</h2>
       <p>{highlight.paragraph}</p>
-      {/* So far only a Significant Event has a Detail Layer; #21 gives one to every card. */}
+      {/* So far only a Significant Event has a Detail Layer; #21 gives one to every Highlight Card. */}
       {highlight.event && <DetailLayer event={highlight.event} />}
     </article>
   )
 }
 
-/** The card's Detail Layer, expanded and collapsed in place. Collapsed, it renders nothing. */
+/** The Highlight Card's Detail Layer, expanded and collapsed in place by its Details toggle.
+ * Collapsed, only the toggle is rendered. */
 function DetailLayer({ event }: { event: SignificantEvent }) {
   const [expanded, setExpanded] = useState(false)
   const toggleId = useId()
@@ -79,7 +80,8 @@ function joinNames(names: string[]): string {
   return new Intl.ListFormat('en', { type: 'conjunction' }).format(names)
 }
 
-/** The moment in the observer's own time zone, like "3:11 PM". */
+/** The moment in the browser's time zone, like "3:11 PM". Reports are requested for that same
+ * zone (see report.ts), so it is the zone the night was computed for. */
 function localTime(moment: string): string {
   return new Date(moment).toLocaleTimeString(undefined, {
     hour: 'numeric',
