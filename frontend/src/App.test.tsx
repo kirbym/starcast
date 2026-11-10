@@ -199,7 +199,7 @@ test.each([
   },
 )
 
-function reportError(statusCode: number, type: string, message: string) {
+function errorResponse(statusCode: number, type: string, message: string) {
   return HttpResponse.json(
     { error: { statusCode, type, message } },
     { status: statusCode },
@@ -240,7 +240,7 @@ test.each([
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await changeFromSanFranciscoToTokyo(() =>
-      reportError(status, type, 'Backend detail: Claude stopped early'),
+      errorResponse(status, type, 'Backend detail: Claude stopped early'),
     )
 
     const toast = await screen.findByRole('alert')
@@ -261,10 +261,10 @@ test.each([
 )
 
 test('asks for another place when the location is rejected', async () => {
-  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
 
   await changeFromSanFranciscoToTokyo(() =>
-    reportError(400, 'invalid_location', 'latitude: out of range'),
+    errorResponse(400, 'invalid_location', 'latitude: out of range'),
   )
 
   const toast = await screen.findByRole('alert')
@@ -278,14 +278,17 @@ test('asks for another place when the location is rejected', async () => {
   expect(screen.getByRole('button', { name: '📍 Set location' })).toBeInTheDocument()
   expect(savedLocation()).toBeNull()
   expect(document.body).not.toHaveTextContent('latitude: out of range')
+  expect(logged).toHaveBeenCalledWith(
+    expect.stringContaining('latitude: out of range'),
+  )
 })
 
 test('leaves the report area empty when the first report fails', async () => {
-  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
   geolocateTo(34.05, -118.24)
   server.use(
     http.post(REPORT_URL, () =>
-      reportError(502, 'narration_failed', 'Claude stopped early'),
+      errorResponse(502, 'narration_failed', 'Claude stopped early'),
     ),
   )
 
@@ -297,6 +300,10 @@ test('leaves the report area empty when the first report fails', async () => {
     screen.getByRole('button', { name: '📍 Los Angeles ▾' }),
   ).toBeInTheDocument()
   expect(savedLocation()).toBeNull()
+  expect(document.body).not.toHaveTextContent('Claude stopped early')
+  expect(logged).toHaveBeenCalledWith(
+    expect.stringContaining('Claude stopped early'),
+  )
 })
 
 test('shows one toast at a time, which only informs and can be dismissed', async () => {
@@ -306,7 +313,7 @@ test('shows one toast at a time, which only informs and can be dismissed', async
   server.use(
     http.post(REPORT_URL, () => {
       reportRequests += 1
-      return reportError(502, 'narration_failed', 'Claude stopped early')
+      return errorResponse(502, 'narration_failed', 'Claude stopped early')
     }),
     http.get(`${NOMINATIM}/search`, () => HttpResponse.json([TOKYO_MATCH])),
   )

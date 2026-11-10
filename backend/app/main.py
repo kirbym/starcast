@@ -80,16 +80,16 @@ def create_report(
         report_request.date,
     )
     highlights = [SkyObject.model_validate(body) for body in sky.highlights]
-    narrated_highlights = [
+    narrator_input = [
         {**highlight.model_dump(mode="json"), "context": body.context}
         for highlight, body in zip(highlights, sky.highlights, strict=True)
     ]
     try:
-        headline, cards = _narrate(narrator, narrated_highlights, highlights)
+        headline, cards = _narrate(narrator, narrator_input, highlights)
     except NarrationError as first_failure:
         logger.warning("Narration failed, retrying once: %s", first_failure)
         sleep(NARRATION_RETRY_DELAY_SECONDS)
-        headline, cards = _narrate(narrator, narrated_highlights, highlights)
+        headline, cards = _narrate(narrator, narrator_input, highlights)
     return ReportResponse(
         headline=headline,
         viewing_window=sky.viewing_window,
@@ -99,10 +99,10 @@ def create_report(
 
 
 def _narrate(
-    narrator: Narrator, narrated_highlights: list[dict], highlights: list[SkyObject]
+    narrator: Narrator, narrator_input: list[dict], highlights: list[SkyObject]
 ) -> tuple[str, list[Highlight]]:
     """One narration attempt: the Headline, and the Highlights with their cards attached."""
-    narration = narrator.narrate(narrated_highlights)
+    narration = narrator.narrate(narrator_input)
     return narration.headline, _merge_cards(highlights, narration)
 
 

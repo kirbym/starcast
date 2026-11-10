@@ -59,15 +59,18 @@ export async function fetchReport(location: Location): Promise<CosmicReport> {
       location_label: location.label,
     }),
   })
-  if (!response.ok) throw await reportError(response)
+  if (!response.ok) throw await parseReportError(response)
   return response.json()
 }
 
 /** The error `type`s the backend's `{error: {statusCode, type, message}}` envelope can carry. */
-export type ReportErrorType =
-  | 'invalid_location'
-  | 'narration_failed'
-  | 'internal_error'
+const REPORT_ERROR_TYPES = [
+  'invalid_location',
+  'narration_failed',
+  'internal_error',
+] as const
+
+export type ReportErrorType = (typeof REPORT_ERROR_TYPES)[number]
 
 /**
  * A report request the backend refused or failed. `message` is the backend's
@@ -85,7 +88,7 @@ export class ReportError extends Error {
   }
 }
 
-async function reportError(response: Response): Promise<ReportError> {
+async function parseReportError(response: Response): Promise<ReportError> {
   const fallback = `Report request failed with status ${response.status}`
   try {
     const { error } = (await response.json()) as {
@@ -102,9 +105,5 @@ async function reportError(response: Response): Promise<ReportError> {
 }
 
 function isReportErrorType(value: unknown): value is ReportErrorType {
-  return (
-    value === 'invalid_location' ||
-    value === 'narration_failed' ||
-    value === 'internal_error'
-  )
+  return (REPORT_ERROR_TYPES as readonly unknown[]).includes(value)
 }

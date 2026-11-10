@@ -451,6 +451,7 @@ def test_narration_whose_card_ids_do_not_match_the_highlights_twice_is_a_narrati
     error = response.json()["error"]
     assert error["statusCode"] == 502
     assert error["type"] == "narration_failed"
+    assert "do not match Highlights" in error["message"]
     assert "Mars!" not in response.text
 
 
