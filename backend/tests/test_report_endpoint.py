@@ -4,8 +4,9 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app import main
 from app.main import app
-from app.narrator import Narration, NarrationCard, get_narrator
+from app.narrator import Narration, NarrationCard, NarrationError, get_narrator
 
 VALID_REQUEST = {
     "latitude": 40.7167,
@@ -29,14 +30,22 @@ JUPITER_NIGHT_REQUEST = {**VALID_REQUEST, "date": "2026-11-05"}
 
 
 class FakeNarrator:
-    """Writes one card per Highlight it is given, echoing each id, unless told what to return."""
+    """Writes one card per Highlight it is given, echoing each id, unless told what to return.
+
+    Each exception queued in `failures` is raised by one call, in order, before it writes again.
+    """
 
     def __init__(self) -> None:
         self.received: list | None = None
         self.cards: list[NarrationCard] | None = None
+        self.failures: list[Exception] = []
+        self.calls = 0
 
     def narrate(self, highlights) -> Narration:
+        self.calls += 1
         self.received = list(highlights)
+        if self.failures:
+            raise self.failures.pop(0)
         cards = self.cards
         if cards is None:
             cards = [
@@ -56,6 +65,14 @@ def narrator() -> Iterator[FakeNarrator]:
     app.dependency_overrides[get_narrator] = lambda: fake
     yield fake
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def retry_delays(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Records each wait before a narration retry instead of sleeping through it."""
+    delays: list[float] = []
+    monkeypatch.setattr(main, "sleep", delays.append)
+    return delays
 
 
 @pytest.fixture
@@ -422,15 +439,75 @@ def test_narrator_receives_the_meteor_shower_and_its_catalog_facts(
         ),
     ],
 )
-def test_narration_whose_card_ids_do_not_match_the_highlights_is_a_narration_failure(
+def test_narration_whose_card_ids_do_not_match_the_highlights_twice_is_a_narration_failure(
     client: TestClient, narrator: FakeNarrator, cards: list[NarrationCard]
 ):
     narrator.cards = cards
 
     response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
+    assert narrator.calls == 2
     assert response.status_code == 502
     error = response.json()["error"]
     assert error["statusCode"] == 502
     assert error["type"] == "narration_failed"
+    assert "do not match Highlights" in error["message"]
     assert "Mars!" not in response.text
+
+
+def test_narration_that_fails_once_is_retried_after_a_short_delay(
+    client: TestClient, narrator: FakeNarrator, retry_delays: list[float]
+):
+    narrator.failures = [NarrationError("Claude stopped early: max_tokens")]
+
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert response.status_code == 200
+    assert response.json()["headline"] == "A hush settles over tonight's sky."
+    assert narrator.calls == 2
+    assert retry_delays == [1.0]
+
+
+def test_narration_that_fails_twice_is_a_narration_failure(
+    client: TestClient, narrator: FakeNarrator, retry_delays: list[float]
+):
+    narrator.failures = [NarrationError("first"), NarrationError("second")]
+
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "error": {"statusCode": 502, "type": "narration_failed", "message": "second"}
+    }
+    assert narrator.calls == 2
+    assert retry_delays == [1.0]
+
+
+def test_unexpected_exception_is_an_internal_error_and_is_not_retried(
+    client: TestClient, narrator: FakeNarrator, retry_delays: list[float]
+):
+    narrator.failures = [RuntimeError("secret internals")]
+
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert response.status_code == 500
+    error = response.json()["error"]
+    assert error["statusCode"] == 500
+    assert error["type"] == "internal_error"
+    assert error["message"]
+    assert "secret internals" not in response.text
+    assert narrator.calls == 1
+    assert retry_delays == []
+
+
+def test_browser_on_the_frontend_origin_can_read_an_internal_error(
+    client: TestClient, narrator: FakeNarrator
+):
+    narrator.failures = [RuntimeError("boom")]
+
+    response = client.post(
+        "/api/report", json=JUPITER_NIGHT_REQUEST, headers={"Origin": "http://localhost:5173"}
+    )
+
+    assert response.status_code == 500
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"

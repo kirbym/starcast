@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { HighlightList } from './HighlightList.tsx'
-import { loadSavedLocation, saveLocation, type Location } from './location.ts'
+import {
+  clearSavedLocation,
+  loadSavedLocation,
+  saveLocation,
+  type Location,
+} from './location.ts'
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
 import PlaceSearch from './PlaceSearch.tsx'
-import { fetchReport, type CosmicReport, type SkyObject } from './report.ts'
+import {
+  fetchReport,
+  ReportError,
+  type CosmicReport,
+  type ReportErrorType,
+  type SkyObject,
+} from './report.ts'
 import ReportSkeleton from './ReportSkeleton.tsx'
+import Toast from './Toast.tsx'
 import { VisibleObjects } from './VisibleObjects.tsx'
 
 const GEOLOCATION_TIMEOUT_MS = 10_000
@@ -18,12 +30,45 @@ type ReportState =
   | { status: 'ready'; report: CosmicReport }
   | { status: 'failed' }
 
+/** The last location whose report succeeded, and that report: what a failure rolls back to. */
+type LastGood = { location: Location; report: CosmicReport }
+
+/** Only one toast shows at a time; a newer one replaces it, under a new id. */
+type ToastState = { id: number; message: string }
+
 function App() {
   const [location, setLocation] = useState<Location | null>(null)
   const [report, setReport] = useState<ReportState>({ status: 'locating' })
+  const [toast, setToast] = useState<ToastState | null>(null)
+  const lastGood = useRef<LastGood | null>(null)
   // Identifies the latest report request. A response for any older request is
   // dropped, so the newest location always wins.
   const latestRequest = useRef(0)
+
+  function showToast(message: string) {
+    setToast((previous) => ({ id: (previous?.id ?? 0) + 1, message }))
+  }
+
+  function reportFailed(target: Location, error: unknown) {
+    const type: ReportErrorType =
+      error instanceof ReportError ? error.type : 'internal_error'
+    if (type === 'invalid_location') {
+      clearSavedLocation()
+      lastGood.current = null
+      setLocation(null)
+      setReport({ status: 'needs-location' })
+      showToast("We couldn't use that location — pick another.")
+      return
+    }
+    showToast(tryAgainMessage(type, target))
+    if (lastGood.current) {
+      setLocation(lastGood.current.location)
+      setReport({ status: 'ready', report: lastGood.current.report })
+    } else {
+      // Nothing to roll back to: the pill keeps the attempted location, unsaved.
+      setReport({ status: 'failed' })
+    }
+  }
 
   async function loadReport(target: Location) {
     const request = ++latestRequest.current
@@ -33,10 +78,16 @@ function App() {
       const loaded = await fetchReport(target)
       if (request !== latestRequest.current) return
       saveLocation(target)
+      lastGood.current = { location: target, report: loaded }
       setReport({ status: 'ready', report: loaded })
     } catch (error) {
-      console.error(error)
-      if (request === latestRequest.current) setReport({ status: 'failed' })
+      // The backend's message is for developers: logged, never shown.
+      console.error(
+        error instanceof ReportError
+          ? `Report failed with ${error.statusCode} ${error.type}: ${error.message}`
+          : error,
+      )
+      if (request === latestRequest.current) reportFailed(target, error)
     }
   }
 
@@ -120,12 +171,26 @@ function App() {
             )}
           </div>
         )}
-        {report.status === 'failed' && (
-          <p role="alert">Tonight's sky is out of reach right now.</p>
-        )}
       </main>
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </>
   )
+}
+
+/** A failure the backend may not repeat, so its copy suggests searching again. */
+function tryAgainMessage(type: ReportErrorType, { label }: Location): string {
+  const sky = label ? `${label}'s sky` : 'the sky over your location'
+  const reason =
+    type === 'narration_failed'
+      ? 'the narrator lost the thread'
+      : 'something went wrong on our end'
+  return `Couldn't read ${sky} — ${reason}. Try searching again.`
 }
 
 /** The Visible objects without a Highlight Card: a highlighted object's details are on its card. */

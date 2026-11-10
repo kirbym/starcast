@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { StrictMode } from 'react'
@@ -34,6 +41,7 @@ afterEach(() => {
   localStorage.clear()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 afterAll(() => server.close())
 
@@ -191,20 +199,145 @@ test.each([
   },
 )
 
-test('says so when the report cannot be fetched', async () => {
-  fakeGeolocation((success) =>
-    success({
-      coords: { latitude: 34.05, longitude: -118.24 },
-    } as GeolocationPosition),
+function errorResponse(statusCode: number, type: string, message: string) {
+  return HttpResponse.json(
+    { error: { statusCode, type, message } },
+    { status: statusCode },
   )
+}
+
+const SAN_FRANCISCO = { latitude: 37.77, longitude: -122.42, label: 'San Francisco' }
+
+/** San Francisco is saved and its report loads; then Tokyo's report gets `tokyoResponse`. */
+async function changeFromSanFranciscoToTokyo(tokyoResponse: () => Response) {
+  saveLocation(SAN_FRANCISCO)
+  const requests: unknown[] = []
   server.use(
-    http.post(REPORT_URL, () => new HttpResponse(null, { status: 500 })),
+    http.post(REPORT_URL, async ({ request }) => {
+      const body = (await request.json()) as { location_label: string }
+      requests.push(body)
+      return body.location_label === 'Tokyo'
+        ? tokyoResponse()
+        : HttpResponse.json(QUIET_NIGHT)
+    }),
+    http.get(`${NOMINATIM}/search`, () => HttpResponse.json([TOKYO_MATCH])),
+  )
+  renderApp()
+  await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
+
+  fireEvent.click(screen.getByRole('button', { name: '📍 San Francisco ▾' }))
+  searchFor('Tokyo')
+  fireEvent.click(await screen.findByRole('button', { name: 'Tokyo, Japan' }))
+  return requests
+}
+
+test.each([
+  [502, 'narration_failed'],
+  [500, 'internal_error'],
+])(
+  'rolls back to the last good location when a location change fails with %i',
+  async (status, type) => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await changeFromSanFranciscoToTokyo(() =>
+      errorResponse(status, type, 'Backend detail: Claude stopped early'),
+    )
+
+    const toast = await screen.findByRole('alert')
+    expect(toast).toHaveTextContent('Tokyo')
+    expect(toast).toHaveTextContent(/try searching again/i)
+    expect(
+      screen.getByRole('button', { name: '📍 San Francisco ▾' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: QUIET_NIGHT.headline }),
+    ).toBeInTheDocument()
+    expect(savedLocation()).toEqual(SAN_FRANCISCO)
+    expect(document.body).not.toHaveTextContent('Backend detail')
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining('Backend detail: Claude stopped early'),
+    )
+  },
+)
+
+test('asks for another place when the location is rejected', async () => {
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  await changeFromSanFranciscoToTokyo(() =>
+    errorResponse(400, 'invalid_location', 'latitude: out of range'),
+  )
+
+  const toast = await screen.findByRole('alert')
+  expect(toast).toHaveTextContent(
+    "We couldn't use that location — pick another.",
+  )
+  expect(toast).not.toHaveTextContent(/try/i)
+  expect(
+    screen.getByRole('heading', { name: 'Where are you stargazing tonight?' }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '📍 Set location' })).toBeInTheDocument()
+  expect(savedLocation()).toBeNull()
+  expect(document.body).not.toHaveTextContent('latitude: out of range')
+  expect(logged).toHaveBeenCalledWith(
+    expect.stringContaining('latitude: out of range'),
+  )
+})
+
+test('leaves the report area empty when the first report fails', async () => {
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+  geolocateTo(34.05, -118.24)
+  server.use(
+    http.post(REPORT_URL, () =>
+      errorResponse(502, 'narration_failed', 'Claude stopped early'),
+    ),
   )
 
   renderApp()
 
-  expect(await screen.findByRole('alert')).toBeInTheDocument()
+  expect(await screen.findByRole('alert')).toHaveTextContent('Los Angeles')
+  expect(screen.getByRole('main')).toBeEmptyDOMElement()
+  expect(
+    screen.getByRole('button', { name: '📍 Los Angeles ▾' }),
+  ).toBeInTheDocument()
   expect(savedLocation()).toBeNull()
+  expect(document.body).not.toHaveTextContent('Claude stopped early')
+  expect(logged).toHaveBeenCalledWith(
+    expect.stringContaining('Claude stopped early'),
+  )
+})
+
+test('shows one toast at a time, which only informs and can be dismissed', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  geolocateTo(34.05, -118.24)
+  let reportRequests = 0
+  server.use(
+    http.post(REPORT_URL, () => {
+      reportRequests += 1
+      return errorResponse(502, 'narration_failed', 'Claude stopped early')
+    }),
+    http.get(`${NOMINATIM}/search`, () => HttpResponse.json([TOKYO_MATCH])),
+  )
+  renderApp()
+  expect(await screen.findByRole('alert')).toHaveTextContent('Los Angeles')
+
+  fireEvent.click(screen.getByRole('button', { name: '📍 Los Angeles ▾' }))
+  searchFor('Tokyo')
+  fireEvent.click(await screen.findByRole('button', { name: 'Tokyo, Japan' }))
+  await waitFor(() =>
+    expect(screen.getByRole('alert')).toHaveTextContent('Tokyo'),
+  )
+
+  const toasts = screen.getAllByRole('alert')
+  expect(toasts).toHaveLength(1)
+  expect(toasts[0]).not.toHaveTextContent('Los Angeles')
+  expect(within(toasts[0]).getAllByRole('button')).toHaveLength(1)
+  expect(reportRequests).toBe(2)
+
+  fireEvent.click(within(toasts[0]).getByRole('button', { name: 'Dismiss' }))
+
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(reportRequests).toBe(2)
 })
 
 test('loads the report for the saved location without asking for geolocation', async () => {
