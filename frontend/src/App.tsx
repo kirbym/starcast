@@ -4,8 +4,9 @@ import { loadSavedLocation, saveLocation, type Location } from './location.ts'
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
 import PlaceSearch from './PlaceSearch.tsx'
-import { fetchReport, type CosmicReport } from './report.ts'
+import { fetchReport, type CosmicReport, type SkyObject } from './report.ts'
 import ReportSkeleton from './ReportSkeleton.tsx'
+import { VisibleObjects } from './VisibleObjects.tsx'
 
 const GEOLOCATION_TIMEOUT_MS = 10_000
 const UNANSWERED_PROMPT_MS = 15_000
@@ -107,7 +108,16 @@ function App() {
         {report.status === 'ready' && (
           <div className="report">
             <h1 className="headline">{report.report.headline}</h1>
-            <HighlightList highlights={report.report.highlights} />
+            {/* A Quiet Night is just its Headline: no cards, and no Detail Layer. */}
+            {report.report.highlights.length > 0 && (
+              <>
+                <HighlightList highlights={report.report.highlights} />
+                <VisibleObjects
+                  viewingWindow={report.report.viewing_window}
+                  objects={notHighlighted(report.report)}
+                />
+              </>
+            )}
           </div>
         )}
         {report.status === 'failed' && (
@@ -116,6 +126,12 @@ function App() {
       </main>
     </>
   )
+}
+
+/** The Visible objects without a Highlight Card: a highlighted object's details are on its card. */
+function notHighlighted({ highlights, visible_objects }: CosmicReport): SkyObject[] {
+  const onCards = new Set(highlights.map((highlight) => highlight.id))
+  return visible_objects.filter((body) => !onCards.has(body.id))
 }
 
 export default App
