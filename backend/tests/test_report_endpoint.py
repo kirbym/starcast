@@ -295,6 +295,51 @@ def test_bright_named_comet_is_listed_with_its_computed_magnitude(client: TestCl
     assert comets[0]["magnitude"] < 6.0
 
 
+# New York on 2020-12-21: the great conjunction of Jupiter and Saturn, low in the south-west.
+GREAT_CONJUNCTION_REQUEST = {**VALID_REQUEST, "date": "2020-12-21"}
+
+
+def test_conjunction_highlight_carries_its_event_with_a_stable_id(client: TestClient):
+    first = client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
+    again = client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
+
+    assert first.status_code == 200
+    event_highlight = first.json()["highlights"][-1]
+    assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
+    assert event_highlight["id"] == "significant_event:conjunction_jupiter_saturn"
+    assert again.json()["highlights"][-1]["id"] == event_highlight["id"]
+    assert event_highlight["category"] == "featured"
+    assert event_highlight["object_type"] == "significant_event"
+    assert event_highlight["name"] == "Jupiter and Saturn in conjunction"
+    assert event_highlight["mini_headline"] == "Jupiter and Saturn in conjunction takes the stage"
+    event = event_highlight["event"]
+    assert set(event) == {"event_type", "peak_time", "related_object_names"}
+    assert event["event_type"] == "conjunction"
+    assert re.fullmatch(r"2020-12-21T\d\d:\d\d:\d\dZ", event["peak_time"])
+    assert event["related_object_names"] == ["Jupiter", "Saturn"]
+
+
+def test_narrator_receives_the_conjunction_event_and_its_separation(
+    client: TestClient, narrator: FakeNarrator
+):
+    client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
+
+    received = narrator.received[-1]
+    assert received["id"] == "significant_event:conjunction_jupiter_saturn"
+    assert received["event"]["event_type"] == "conjunction"
+    assert received["event"]["related_object_names"] == ["Jupiter", "Saturn"]
+    assert isinstance(received["event"]["peak_time"], str)
+    assert received["context"]["separation_degrees"] == pytest.approx(0.10, abs=0.01)
+
+
+def test_conjunction_is_a_highlight_but_not_a_visible_object(client: TestClient):
+    response = client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
+
+    visible = response.json()["visible_objects"]
+    assert {"planet:jupiter", "planet:saturn"} <= {body["id"] for body in visible}
+    assert all(body["event"] is None for body in visible)
+
+
 @pytest.mark.parametrize(
     "cards",
     [

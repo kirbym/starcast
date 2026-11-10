@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
-from app.astronomy import Category, ObjectType, ViewingWindow
+from app.astronomy import Category, EventType, ObjectType, ViewingWindow
 
 # Whole years inside DE440s's coverage (December 1849 to January 2150).
 _EARLIEST_YEAR = 1850
@@ -38,6 +38,16 @@ class ReportRequest(BaseModel):
     location_label: str | None = None
 
 
+class SignificantEvent(BaseModel):
+    """A Significant Event Highlight's event: what happens, at its best when, and between what."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type: EventType
+    peak_time: dt.datetime
+    related_object_names: list[str] | None
+
+
 class SkyObject(BaseModel):
     """A Visible body's raw fields: one entry of visible_objects, and what the Narrator is given."""
 
@@ -52,7 +62,7 @@ class SkyObject(BaseModel):
     rises_at: dt.datetime | None
     sets_at: dt.datetime | None
     magnitude: float | None
-    event: None
+    event: SignificantEvent | None
 
 
 class Highlight(SkyObject):

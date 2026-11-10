@@ -598,3 +598,91 @@ def test_named_comet_whose_elements_cannot_be_used_is_left_out(monkeypatch):
 
     assert comets(sky) == []
     assert category_3_highlight(sky) is not None
+
+
+def significant_event(sky):
+    """The night's Significant Event Highlight, or None."""
+    event = category_3_highlight(sky)
+    return event if event and event.object_type == "significant_event" else None
+
+
+GREAT_CONJUNCTION_NIGHT = date(2020, 12, 21)
+LONDON = (51.5074, -0.1278)
+
+
+def test_great_conjunction_of_jupiter_and_saturn_is_the_category_3_highlight():
+    # 2020-12-21 from New York: Jupiter and Saturn, a tenth of a degree apart, hang low in the
+    # south-west at dusk, the closest they had appeared since 1623.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", GREAT_CONJUNCTION_NIGHT)
+
+    conjunction = significant_event(sky)
+    assert conjunction.id == "significant_event:conjunction_jupiter_saturn"
+    assert conjunction.category == "featured"
+    assert conjunction.name == "Jupiter and Saturn in conjunction"
+    assert conjunction.event.event_type == "conjunction"
+    assert conjunction.event.related_object_names == ("Jupiter", "Saturn")
+    assert conjunction.context["separation_degrees"] == pytest.approx(0.10, abs=0.01)
+    # Closest approach was at 18:20 UTC, before dusk here; from dusk on they only draw apart, so
+    # the closest Visible moment is as the Viewing Window opens, before the pair sets.
+    jupiter, saturn = (visible_body(sky, f"planet:{name}") for name in ("jupiter", "saturn"))
+    window = sky.viewing_window
+    assert window.starts_at <= conjunction.event.peak_time < min(jupiter.sets_at, saturn.sets_at)
+    # Where to look: low in the south-west, where the pair stands at that moment.
+    assert 0 < conjunction.peak_altitude_degrees < 10
+    assert 200 < conjunction.azimuth_at_peak_degrees < 260
+    # The event is a Highlight, not a body: its two planets are listed as Visible instead.
+    assert "significant_event" not in {body.object_type for body in sky.visible_objects}
+    assert {"planet:jupiter", "planet:saturn"} <= visible_ids(sky)
+
+
+def test_conjunction_counts_at_its_closest_moment_while_both_bodies_are_up():
+    # 2020-12-21 from London: the pair was still closing as it set, so its very closest sample
+    # comes after both have gone below the horizon. They were as close while still up at dusk.
+    sky = compute_night_sky(*LONDON, "Europe/London", GREAT_CONJUNCTION_NIGHT)
+
+    conjunction = significant_event(sky)
+    assert conjunction.id == "significant_event:conjunction_jupiter_saturn"
+    jupiter = visible_body(sky, "planet:jupiter")
+    assert conjunction.event.peak_time < jupiter.sets_at
+
+
+def test_body_can_be_the_category_1_highlight_and_part_of_the_category_3_conjunction():
+    # 2020-12-21 from Sydney: Jupiter stands a touch higher than Saturn at dusk, so it takes
+    # Category 1, and the waxing Moon is not yet half lit.
+    sky = compute_night_sky(*SYDNEY, "Australia/Sydney", GREAT_CONJUNCTION_NIGHT)
+
+    assert category_1_highlight(sky).id == "planet:jupiter"
+    assert "Jupiter" in significant_event(sky).event.related_object_names
+
+
+def test_pair_within_2_degrees_only_below_the_horizon_is_not_a_conjunction():
+    # 2019-08-11 from New York: the Moon closes to about 1.6 degrees from Saturn before dawn, but
+    # only after both have set. While both are up they stay more than 2.2 degrees apart.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2019, 8, 11))
+    assert {"moon:moon", "planet:saturn"} <= visible_ids(sky)
+
+    assert significant_event(sky) is None
+    assert category_3_highlight(sky).id == "bright_star:arcturus"
+
+
+def test_tightest_of_two_conjunctions_is_the_category_3_highlight():
+    # 2018-01-04 from New York: before dawn, Mars sits under a degree from Jupiter in Libra, while
+    # the waning gibbous Moon passes even closer to Regulus in Leo.
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2018, 1, 4))
+
+    conjunction = significant_event(sky)
+    assert conjunction.id == "significant_event:conjunction_moon_regulus"
+    assert conjunction.event.related_object_names == ("Moon", "Regulus")
+    assert conjunction.context["separation_degrees"] < 0.5
+
+
+def test_dso_near_a_planet_never_makes_a_conjunction():
+    # 2020-04-03 from New York: Venus passes a quarter of a degree from the Pleiades (M45), high
+    # in the west after dusk. DSOs never take part in a conjunction: if they did, the pair would
+    # be a Significant Event and win Category 3 over the Pleiades as a standing body.
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", date(2020, 4, 3), only_featured("dso:m45")
+    )
+    assert {"planet:venus", "dso:m45"} <= visible_ids(sky)
+
+    assert category_3_highlight(sky).id == "dso:m45"
