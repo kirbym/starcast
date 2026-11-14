@@ -64,6 +64,23 @@ NAMED_COMETS = (
 )
 _NAMED_DESIGNATIONS = frozenset(comet.designation for comet in NAMED_COMETS)
 
+# The columns that place a comet. A row missing any of them cannot be used.
+_ORBIT_COLUMNS = (
+    "perihelion_year",
+    "perihelion_month",
+    "perihelion_day",
+    "perihelion_distance_au",
+    "eccentricity",
+    "argument_of_perihelion_degrees",
+    "longitude_of_ascending_node_degrees",
+    "inclination_degrees",
+)
+# Blank in some rows, so read as NaN. A comet of unknown brightness is never Visible.
+_MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
+_NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
+# Where a row of the MPC comet format keeps the designation and name.
+_DESIGNATION_FIELD = slice(102, 158)
+
 
 def named_comet_elements(cache_dir: Path) -> dict[str, CometElements]:
     """The orbital elements of each Named Comet, by MPC designation.
@@ -184,28 +201,10 @@ def _parse_named(content: bytes) -> dict[str, CometElements]:
     for column in _NUMERIC_COLUMNS:
         rows[column] = pd.to_numeric(rows[column], errors="coerce")
     rows = rows.dropna(subset=list(_ORBIT_COLUMNS))
-    rows["perihelion_year"] = rows["perihelion_year"].astype(int)
-    rows["perihelion_month"] = rows["perihelion_month"].astype(int)
+    rows = rows.astype({"perihelion_year": int, "perihelion_month": int})
     return {row["designation"]: row for _, row in rows.iterrows()}
 
 
-# The columns that place a comet. A row missing any of them cannot be used.
-_ORBIT_COLUMNS = (
-    "perihelion_year",
-    "perihelion_month",
-    "perihelion_day",
-    "perihelion_distance_au",
-    "eccentricity",
-    "argument_of_perihelion_degrees",
-    "longitude_of_ascending_node_degrees",
-    "inclination_degrees",
-)
-# Blank in some rows; the comet is then placed but its brightness is unknown.
-_MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
-_NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
-# Where a row of the MPC comet format keeps the designation and name.
-_DESIGNATION_FIELD = slice(102, 158)
-
-
 def _designation(line: bytes) -> str:
+    """The designation and name a row is filed under, as in "C/2020 F3 (NEOWISE)"."""
     return line[_DESIGNATION_FIELD].decode("ascii", errors="replace").strip()

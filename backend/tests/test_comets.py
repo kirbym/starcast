@@ -170,7 +170,7 @@ def test_irregular_rows_in_the_elements_still_yield_numeric_named_comets(
     assert set(found) == {"C/2020 F3 (NEOWISE)", "C/1965 S1-A (Ikeya-Seki)"}
     neowise = found["C/2020 F3 (NEOWISE)"]
     assert neowise.perihelion_year == 2020
-    assert isinstance(neowise.perihelion_year, int | float)
+    assert isinstance(neowise.perihelion_year, int)
     assert neowise.perihelion_day == pytest.approx(5.1107)
     assert neowise.magnitude_g == pytest.approx(7.5)
     assert neowise.magnitude_k == pytest.approx(5.2)
