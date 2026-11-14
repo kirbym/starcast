@@ -64,6 +64,23 @@ NAMED_COMETS = (
 )
 _NAMED_DESIGNATIONS = frozenset(comet.designation for comet in NAMED_COMETS)
 
+# The columns that place a comet. A row missing any of them cannot be used.
+_ORBIT_COLUMNS = (
+    "perihelion_year",
+    "perihelion_month",
+    "perihelion_day",
+    "perihelion_distance_au",
+    "eccentricity",
+    "argument_of_perihelion_degrees",
+    "longitude_of_ascending_node_degrees",
+    "inclination_degrees",
+)
+# Blank in some rows, so read as NaN. A comet of unknown brightness is never Visible.
+_MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
+_NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
+# Where a row of the MPC comet format keeps the designation and name.
+_DESIGNATION_FIELD = slice(102, 158)
+
 
 def named_comet_elements(cache_dir: Path) -> dict[str, CometElements]:
     """The orbital elements of each Named Comet, by MPC designation.
@@ -163,13 +180,31 @@ def _read_elements_version(path: Path, _mtime_ns: int, _size: int) -> dict[str, 
 
 
 def _parse_named(content: bytes) -> dict[str, CometElements]:
-    """The Named Comets' rows in an MPC comet elements file, or none if it cannot be parsed."""
+    """The Named Comets' rows in an MPC comet elements file, or none if it cannot be parsed.
+
+    Some old comets' rows in AllCometEls.txt do not keep the standard column widths, and pandas
+    would then read every column as text. So only the Named Comets' rows are parsed, and their
+    numbers are coerced: a blank magnitude parameter becomes NaN, and a row whose orbit cannot be
+    read is dropped.
+    """
+    named_lines = b"".join(
+        line
+        for line in content.splitlines(keepends=True)
+        if _designation(line) in _NAMED_DESIGNATIONS
+    )
+    if not named_lines:
+        return {}
     try:
-        rows = mpc.load_comets_dataframe(io.BytesIO(content))
+        rows = mpc.load_comets_dataframe(io.BytesIO(named_lines))
     except Exception:
         return {}
-    return {
-        row["designation"]: row
-        for _, row in rows.iterrows()
-        if row["designation"] in _NAMED_DESIGNATIONS
-    }
+    for column in _NUMERIC_COLUMNS:
+        rows[column] = pd.to_numeric(rows[column], errors="coerce")
+    rows = rows.dropna(subset=list(_ORBIT_COLUMNS))
+    rows = rows.astype({"perihelion_year": int, "perihelion_month": int})
+    return {row["designation"]: row for _, row in rows.iterrows()}
+
+
+def _designation(line: bytes) -> str:
+    """The designation and name a row is filed under, as in "C/2020 F3 (NEOWISE)"."""
+    return line[_DESIGNATION_FIELD].decode("ascii", errors="replace").strip()

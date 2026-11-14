@@ -1,3 +1,4 @@
+import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -151,3 +152,37 @@ def test_elements_that_cannot_be_written_to_the_cache_yield_no_comets(
     cache = MpcElementsCache(blocker / "AllCometEls.txt", fetch=FakeFetch(elements))
 
     assert cache.named_comet_elements() == {}
+
+
+# Rows copied from the live AllCometEls.txt (downloaded 2026-11-10): three old comets whose
+# columns are not the standard widths, Ikeya-Seki with its magnitude parameters left blank,
+# NEOWISE, and a comet that is not a Named Comet.
+IRREGULAR_ELEMENTS = Path(__file__).parent / "fixtures" / "comet_elements_irregular.txt"
+
+
+def test_irregular_rows_in_the_elements_still_yield_numeric_named_comets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(IRREGULAR_ELEMENTS))
+
+    found = named_comet_elements(tmp_path)
+
+    assert set(found) == {"C/2020 F3 (NEOWISE)", "C/1965 S1-A (Ikeya-Seki)"}
+    neowise = found["C/2020 F3 (NEOWISE)"]
+    assert neowise.perihelion_year == 2020
+    assert isinstance(neowise.perihelion_year, int)
+    assert neowise.perihelion_day == pytest.approx(5.1107)
+    assert neowise.magnitude_g == pytest.approx(7.5)
+    assert neowise.magnitude_k == pytest.approx(5.2)
+
+
+def test_named_comet_with_blank_magnitudes_has_nan_magnitudes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(IRREGULAR_ELEMENTS))
+
+    ikeya_seki = named_comet_elements(tmp_path)["C/1965 S1-A (Ikeya-Seki)"]
+
+    assert ikeya_seki.perihelion_year == 1965
+    assert math.isnan(ikeya_seki.magnitude_g)
+    assert math.isnan(ikeya_seki.magnitude_k)
