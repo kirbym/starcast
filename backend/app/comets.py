@@ -212,12 +212,11 @@ def _select_named_rows(content: bytes) -> pd.DataFrame | None:
 
 
 def _coerce_elements(rows: pd.DataFrame) -> pd.DataFrame:
-    """Parsed comet rows made usable for placing the comets.
+    """The Named Comets' parsed rows, made usable for placing them.
 
     Numeric columns become numbers, so a blank magnitude parameter becomes NaN; a row whose orbit
     cannot be read is dropped; and the perihelion year and month become integers.
     """
-    rows = rows.copy()
     for column in _NUMERIC_COLUMNS:
         rows[column] = pd.to_numeric(rows[column], errors="coerce")
     rows = rows.dropna(subset=list(_ORBIT_COLUMNS))
