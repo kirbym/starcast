@@ -1,14 +1,22 @@
+import io
 import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from skyfield.api import load
+from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
+from skyfield.data import mpc
 
 from app.comets import (
+    _NUMERIC_COLUMNS,
+    _ORBIT_COLUMNS,
     NAMED_COMETS,
     PINNED_ELEMENTS_ENV,
     MpcElementsCache,
+    _designation,
     named_comet_elements,
 )
 
@@ -186,3 +194,38 @@ def test_named_comet_with_blank_magnitudes_has_nan_magnitudes(
     assert ikeya_seki.perihelion_year == 1965
     assert math.isnan(ikeya_seki.magnitude_g)
     assert math.isnan(ikeya_seki.magnitude_k)
+
+
+# Our view of the MPC comet layout must agree with Skyfield's parser, or the Named Comets would
+# drop out of reports with only a log warning, as in #40.
+
+
+def skyfield_rows(content: bytes) -> pd.DataFrame:
+    return mpc.load_comets_dataframe(io.BytesIO(content))
+
+
+def test_skyfield_parses_every_column_we_read(elements: bytes):
+    assert set(_NUMERIC_COLUMNS) <= set(skyfield_rows(elements).columns)
+
+
+def test_skyfield_places_a_comet_from_our_orbit_columns_alone(elements: bytes):
+    row = skyfield_rows(elements).iloc[0]
+
+    mpc.comet_orbit(row[[*_ORBIT_COLUMNS, "designation"]], load.timescale(builtin=True), GM_SUN)
+
+
+@pytest.mark.parametrize("column", _ORBIT_COLUMNS)
+def test_skyfield_needs_each_of_our_orbit_columns(elements: bytes, column: str):
+    row = skyfield_rows(elements).iloc[0].drop(column)
+
+    with pytest.raises((AttributeError, KeyError)):
+        mpc.comet_orbit(row, load.timescale(builtin=True), GM_SUN)
+
+
+def test_our_designation_of_each_row_is_skyfields(elements: bytes):
+    lines = elements.splitlines(keepends=True)
+
+    ours = [_designation(line) for line in lines]
+
+    assert ours == list(skyfield_rows(elements)["designation"])
+    assert set(ours) == NAMED_DESIGNATIONS
