@@ -16,12 +16,12 @@ The project uses Python. The .gitignore includes patterns for:
 
 ## Git workflow
 
-Every session that changes code runs on a feature branch and lands through a PR. `main` takes changes only by merged PR, never by a direct commit.
+Every session that changes code runs in its own git worktree and lands through a PR from that worktree's branch. `main` takes changes only by merged PR, never by a direct commit.
 
-1. **Sync `main`**: `git switch main && git pull origin main`. Done when `main` matches `origin/main`. Exception: if the session starts on a feature branch for the same task, stay on that branch and skip to step 3.
-2. **Cut the feature branch** from the freshly pulled `main`, named `<short-slug>-<issue#>` (e.g. `detail-layer-21`), or just `<short-slug>` when there is no issue.
-3. **Do the work**, committing on the feature branch.
-4. **Open a PR** into `main` with `gh pr create --base main`, and reference the issue it resolves. Done when the PR URL is in your final report.
+1. **Use the session worktree.** A worktree session (e.g. `claude --worktree`) is already checked out on its own branch: that branch is the PR branch. A session that starts in the primary checkout enters a worktree first (`EnterWorktree`). Done when `git branch --show-current` names the worktree's branch, not `main`.
+2. **Sync with `main`**: `git fetch origin && git rebase origin/main`. `main` stays checked out in the primary checkout, so a worktree cannot `git switch main`; rebasing onto `origin/main` takes its place. Done when `git merge-base --is-ancestor origin/main HEAD` succeeds.
+3. **Do the work**, committing on the worktree branch.
+4. **Open a PR** into `main`: `git push -u origin HEAD`, then `gh pr create --base main`, referencing the issue it resolves (`Closes #<issue>`). Done when the PR URL is in your final report.
 
 ## Development Commands
 
