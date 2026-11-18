@@ -1,16 +1,25 @@
+import io
 import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from skyfield.api import load
+from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
+from skyfield.data import mpc
 
 from app.comets import (
+    _NUMERIC_COLUMNS,
+    _ORBIT_COLUMNS,
     NAMED_COMETS,
     PINNED_ELEMENTS_ENV,
     MpcElementsCache,
+    _designation,
     named_comet_elements,
 )
+from tests.conftest import PINNED_COMET_ELEMENTS
 
 NOW = datetime(2026, 11, 9, 12, tzinfo=UTC)
 NAMED_DESIGNATIONS = {comet.designation for comet in NAMED_COMETS}
@@ -186,3 +195,49 @@ def test_named_comet_with_blank_magnitudes_has_nan_magnitudes(
     assert ikeya_seki.perihelion_year == 1965
     assert math.isnan(ikeya_seki.magnitude_g)
     assert math.isnan(ikeya_seki.magnitude_k)
+
+
+# Our view of the MPC comet layout must agree with Skyfield's parser, or the Named Comets would
+# drop out of reports with only a log warning, as in #40.
+
+
+def skyfield_rows(content: bytes) -> pd.DataFrame:
+    return mpc.load_comets_dataframe(io.BytesIO(content))
+
+
+def test_skyfield_parses_every_column_we_read(elements: bytes):
+    assert set(_NUMERIC_COLUMNS) <= set(skyfield_rows(elements).columns)
+
+
+def place(row: pd.Series) -> None:
+    mpc.comet_orbit(row, load.timescale(builtin=True), GM_SUN)
+
+
+def test_skyfield_places_a_comet_from_our_orbit_columns_alone(elements: bytes):
+    row = skyfield_rows(elements).iloc[0]
+
+    place(row[[*_ORBIT_COLUMNS, "designation"]])
+
+
+@pytest.mark.parametrize("column", _ORBIT_COLUMNS)
+def test_skyfield_needs_each_of_our_orbit_columns(elements: bytes, column: str):
+    row = skyfield_rows(elements).iloc[0].drop(column)
+
+    # Skyfield reads most columns as attributes and the designation by key.
+    with pytest.raises((AttributeError, KeyError)):
+        place(row)
+
+
+@pytest.mark.parametrize(
+    "fixture", [PINNED_COMET_ELEMENTS, IRREGULAR_ELEMENTS], ids=["clean", "irregular"]
+)
+def test_our_designation_of_each_row_is_skyfields(fixture: Path):
+    content = fixture.read_bytes()
+
+    ours = [_designation(line) for line in content.splitlines(keepends=True)]
+    skyfields = skyfield_rows(content)["designation"]
+
+    # Skyfield finds no designation in a row without a reference, like the oldest comets'.
+    compared = [(o, s) for o, s in zip(ours, skyfields, strict=True) if isinstance(s, str)]
+    assert [o for o, _ in compared] == [s for _, s in compared]
+    assert NAMED_DESIGNATIONS & {o for o, _ in compared}

@@ -64,7 +64,8 @@ NAMED_COMETS = (
 )
 _NAMED_DESIGNATIONS = frozenset(comet.designation for comet in NAMED_COMETS)
 
-# The columns that place a comet. A row missing any of them cannot be used.
+# The columns that place a comet. A row missing any of them cannot be used. Skyfield keeps no
+# list of them, so this one is ours, and tests/test_comets.py checks it against Skyfield.
 _ORBIT_COLUMNS = (
     "perihelion_year",
     "perihelion_month",
@@ -78,8 +79,10 @@ _ORBIT_COLUMNS = (
 # Blank in some rows, so read as NaN. A comet of unknown brightness is never Visible.
 _MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
 _NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
-# Where a row of the MPC comet format keeps the designation and name.
-_DESIGNATION_FIELD = slice(102, 158)
+# Where a row of the MPC comet format keeps the designation and name, read from Skyfield's own
+# layout of the format so the two cannot drift apart. Skyfield keeps that layout private, so if
+# it is renamed, importing this module fails rather than every Named Comet quietly going missing.
+_DESIGNATION_FIELD = slice(*dict(mpc._COMET_COLUMNS)["designation"])
 
 
 def named_comet_elements(cache_dir: Path) -> dict[str, CometElements]:
