@@ -781,7 +781,7 @@ def _observe_comet(
     A Named Comet counts only when it is no fainter than the naked-eye limit at its Peak Altitude.
     """
     # MPC comet orbits are centred on the Sun, not on the Solar System's barycenter.
-    orbit = mpc.comet_orbit(elements, _timescale, GM_SUN)
+    orbit = mpc.comet_orbit(elements.to_skyfield_row(), _timescale, GM_SUN)
     target = _ephemeris()["sun"] + orbit
     track = _track(observer, target, samples)
     peak = _peak(track, samples)
@@ -891,7 +891,7 @@ def _comet_magnitude(
 def _perihelion_date(elements: CometElements) -> str:
     """The date of the perihelion passage the elements describe, as YYYY-MM-DD."""
     perihelion = _timescale.tt(
-        int(elements.perihelion_year), int(elements.perihelion_month), elements.perihelion_day
+        elements.perihelion_year, elements.perihelion_month, elements.perihelion_day
     )
     return perihelion.utc_datetime().date().isoformat()
 

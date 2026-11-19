@@ -1,3 +1,4 @@
+import dataclasses
 import io
 import math
 import os
@@ -11,10 +12,12 @@ from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 
 from app.comets import (
+    _MAGNITUDE_COLUMNS,
     _NUMERIC_COLUMNS,
     _ORBIT_COLUMNS,
     NAMED_COMETS,
     PINNED_ELEMENTS_ENV,
+    CometElements,
     MpcElementsCache,
     _designation,
     named_comet_elements,
@@ -169,32 +172,46 @@ def test_elements_that_cannot_be_written_to_the_cache_yield_no_comets(
 IRREGULAR_ELEMENTS = Path(__file__).parent / "fixtures" / "comet_elements_irregular.txt"
 
 
-def test_irregular_rows_in_the_elements_still_yield_numeric_named_comets(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
+@pytest.fixture
+def irregular_elements(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, CometElements]:
+    """The Named Comets' elements parsed from the irregular fixture, pinned in the MPC's place."""
     monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(IRREGULAR_ELEMENTS))
+    return named_comet_elements(tmp_path)
 
-    found = named_comet_elements(tmp_path)
 
-    assert set(found) == {"C/2020 F3 (NEOWISE)", "C/1965 S1-A (Ikeya-Seki)"}
-    neowise = found["C/2020 F3 (NEOWISE)"]
-    assert neowise.perihelion_year == 2020
-    assert isinstance(neowise.perihelion_year, int)
+def test_irregular_rows_in_the_elements_still_yield_typed_named_comets(
+    irregular_elements: dict[str, CometElements],
+):
+    assert set(irregular_elements) == {"C/2020 F3 (NEOWISE)", "C/1965 S1-A (Ikeya-Seki)"}
+    neowise = irregular_elements["C/2020 F3 (NEOWISE)"]
+    assert isinstance(neowise, CometElements)
+    assert neowise.designation == "C/2020 F3 (NEOWISE)"
+    assert (neowise.perihelion_year, neowise.perihelion_month) == (2020, 7)
+    assert type(neowise.perihelion_year) is int
+    assert type(neowise.perihelion_month) is int
     assert neowise.perihelion_day == pytest.approx(5.1107)
     assert neowise.magnitude_g == pytest.approx(7.5)
     assert neowise.magnitude_k == pytest.approx(5.2)
+    for field in (*_ORBIT_COLUMNS, *_MAGNITUDE_COLUMNS):
+        if field not in ("perihelion_year", "perihelion_month"):
+            assert type(getattr(neowise, field)) is float, field
 
 
 def test_named_comet_with_blank_magnitudes_has_nan_magnitudes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    irregular_elements: dict[str, CometElements],
 ):
-    monkeypatch.setenv(PINNED_ELEMENTS_ENV, str(IRREGULAR_ELEMENTS))
-
-    ikeya_seki = named_comet_elements(tmp_path)["C/1965 S1-A (Ikeya-Seki)"]
+    ikeya_seki = irregular_elements["C/1965 S1-A (Ikeya-Seki)"]
 
     assert ikeya_seki.perihelion_year == 1965
     assert math.isnan(ikeya_seki.magnitude_g)
     assert math.isnan(ikeya_seki.magnitude_k)
+
+
+def test_comet_elements_are_frozen(irregular_elements: dict[str, CometElements]):
+    neowise = irregular_elements["C/2020 F3 (NEOWISE)"]
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        neowise.perihelion_year = 2021  # type: ignore[misc]
 
 
 # Our view of the MPC comet layout must agree with Skyfield's parser, or the Named Comets would
@@ -217,6 +234,24 @@ def test_skyfield_places_a_comet_from_our_orbit_columns_alone(elements: bytes):
     row = skyfield_rows(elements).iloc[0]
 
     place(row[[*_ORBIT_COLUMNS, "designation"]])
+
+
+def test_skyfield_places_a_comet_from_its_typed_elements(elements: bytes, tmp_path: Path):
+    neowise = named_comet_elements(tmp_path)["C/2020 F3 (NEOWISE)"]
+    rows = skyfield_rows(elements).set_index("designation", drop=False)
+    timescale = load.timescale(builtin=True)
+    moment = timescale.utc(2020, 7, 20)
+
+    ours = mpc.comet_orbit(neowise.to_skyfield_row(), timescale, GM_SUN)
+    theirs = mpc.comet_orbit(rows.loc["C/2020 F3 (NEOWISE)"], timescale, GM_SUN)
+
+    assert ours.at(moment).position.au == pytest.approx(theirs.at(moment).position.au)
+
+
+def test_comet_elements_fields_are_the_columns_we_read():
+    names = [field.name for field in dataclasses.fields(CometElements)]
+
+    assert sorted(names) == sorted(["designation", *_NUMERIC_COLUMNS])
 
 
 @pytest.mark.parametrize("column", _ORBIT_COLUMNS)
