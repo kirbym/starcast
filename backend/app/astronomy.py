@@ -38,15 +38,17 @@ COMET_MAGNITUDE_LIMIT = 6.0
 # Two bodies at most this far apart, both above the horizon at that moment, are in conjunction.
 CONJUNCTION_LIMIT_DEGREES = 2.0
 
-Category = Literal["planet_moon", "constellation", "featured"]
+# Named by number, as CONTEXT.md names them: 1 Planet or Moon, 2 Named Constellation, 3 Bright
+# Star, Named Comet, DSO or Significant Event.
+Category = Literal[1, 2, 3]
 ObjectType = Literal[
-    "planet", "moon", "constellation", "bright_star", "comet", "dso", "significant_event"
+    "planet", "moon", "constellation", "bright_star", "named_comet", "dso", "significant_event"
 ]
 EventType = Literal["conjunction", "opposition", "meteor_shower"]
 Hemisphere = Literal["north", "south"]
 
 # The bodies that move against the stars. Only they can start a conjunction.
-_MOVING_TYPES = frozenset({"planet", "moon", "comet"})
+_MOVING_TYPES = frozenset({"planet", "moon", "named_comet"})
 # The Planets beyond Earth's orbit, by catalog key. Only they can stand opposite the Sun.
 _SUPERIOR_PLANETS = frozenset({"mars", "jupiter", "saturn", "uranus", "neptune"})
 # Skyfield's almanac.oppositions_conjunctions() code for "opposite the Sun".
@@ -58,12 +60,12 @@ SHOWER_ZHR_LIMIT = 20
 
 
 _CATEGORIES: dict[ObjectType, Category] = {
-    "planet": "planet_moon",
-    "moon": "planet_moon",
-    "constellation": "constellation",
-    "bright_star": "featured",
-    "comet": "featured",
-    "dso": "featured",
+    "planet": 1,
+    "moon": 1,
+    "constellation": 2,
+    "bright_star": 3,
+    "named_comet": 3,
+    "dso": 3,
 }
 
 # Catalog facts about a body that the Narrator can draw on, like a star's spectral type.
@@ -140,7 +142,7 @@ class Catalog:
     planets_and_moon: tuple[CatalogBody, ...]
     constellations: tuple[CatalogBody, ...]
     # The standing Category 3 candidates: the Bright Stars, Named Comets and DSOs.
-    featured: tuple[CatalogBody, ...]
+    category_3: tuple[CatalogBody, ...]
     meteor_showers: tuple[MeteorShower, ...]
 
 
@@ -266,7 +268,7 @@ def _named_comets() -> tuple[CatalogBody, ...]:
     """The Named Comets. Their magnitude, like their position, is computed for the night."""
     return tuple(
         CatalogBody(
-            "comet",
+            "named_comet",
             comet.key,
             comet.name,
             comet,
@@ -328,7 +330,7 @@ def _hemisphere(value: str) -> Hemisphere | None:
 CATALOG = Catalog(
     planets_and_moon=_SOLAR_SYSTEM,
     constellations=_load_constellations(),
-    featured=_load_bright_stars() + _named_comets() + _load_dsos(),
+    category_3=_load_bright_stars() + _named_comets() + _load_dsos(),
     meteor_showers=_load_meteor_showers(),
 )
 
@@ -419,18 +421,24 @@ def compute_night_sky(
     samples = _sample_times(window)
     planets_and_moon = _observe_visible(catalog.planets_and_moon, observer, samples)
     constellations = _observe_visible(catalog.constellations, observer, samples)
-    featured = _observe_visible(catalog.featured, observer, samples, _comet_elements(catalog))
+    category_3_bodies = _observe_visible(
+        catalog.category_3, observer, samples, _comet_elements(catalog)
+    )
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
     night = _Night(observer, latitude, local_noon, samples)
-    category_3 = _category_3_highlight(planets_and_moon + featured, night, catalog.meteor_showers)
+    category_3 = _category_3_highlight(
+        planets_and_moon + category_3_bodies, night, catalog.meteor_showers
+    )
     highlights = [seen.highlight for seen in (category_1, category_2) if seen]
     if category_3:
         highlights.append(category_3)
     return NightSky(
         viewing_window=window,
         highlights=highlights,
-        visible_objects=[seen.body for seen in planets_and_moon + constellations + featured],
+        visible_objects=[
+            seen.body for seen in planets_and_moon + constellations + category_3_bodies
+        ],
     )
 
 
@@ -503,7 +511,7 @@ def _observe_named_comet(
 
 def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
     """The Named Comets' orbital elements, if the catalog has any Named Comets to place."""
-    if not any(isinstance(body.target, NamedComet) for body in catalog.featured):
+    if not any(isinstance(body.target, NamedComet) for body in catalog.category_3):
         return {}
     return named_comet_elements(data_dir())
 
@@ -514,12 +522,12 @@ def _category_3_highlight(
     """Category 3: a Significant Event wins outright; otherwise the best standing body.
 
     `observed` is every Visible body of the night outside Category 2. The standing candidates
-    among them are the featured ones: the Bright Stars, Named Comets and DSOs.
+    among them are the Category 3 bodies: the Bright Stars, Named Comets and DSOs.
     """
     event = _significant_event(observed, night, showers)
     if event:
         return event
-    standing = [seen for seen in observed if seen.body.category == "featured"]
+    standing = [seen for seen in observed if seen.body.category == 3]
     best = max(standing, key=_category_3_priority, default=None)
     return best.highlight if best else None
 
@@ -589,7 +597,7 @@ def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _C
     pair = (first.body, second.body)
     body = VisibleBody(
         id=f"significant_event:conjunction_{first.catalog_body.key}_{second.catalog_body.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{first.body.name} and {second.body.name} in conjunction",
         # The pair stands within a couple of degrees of the first body: look there.
@@ -646,7 +654,7 @@ def _opposition_highlight(seen: _Observation, moment: Time) -> Highlight:
     body = replace(
         planet,
         id=f"significant_event:opposition_{seen.catalog_body.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{planet.name} at opposition",
         event=SignificantEvent(
@@ -715,7 +723,7 @@ def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> Highlight |
         context["zhr_note"] = shower.zhr_note
     body = VisibleBody(
         id=f"significant_event:meteor_shower_{shower.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{shower.name} meteor shower",
         peak_altitude_degrees=peak.altitude_degrees,

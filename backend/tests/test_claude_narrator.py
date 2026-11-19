@@ -79,7 +79,7 @@ def test_every_banned_phrase_reaches_the_system_prompt():
 
 JUPITER = VisibleBody(
     id="planet:jupiter",
-    category="planet_moon",
+    category=1,
     object_type="planet",
     name="Jupiter",
     peak_altitude_degrees=54.8,
@@ -94,7 +94,7 @@ def test_sends_each_highlights_raw_fields_and_context_as_json():
     client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
     conjunction = VisibleBody(
         id="significant_event:conjunction_jupiter_saturn",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name="Jupiter and Saturn in conjunction",
         peak_altitude_degrees=12.0,
