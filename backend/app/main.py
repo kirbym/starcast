@@ -10,9 +10,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.astronomy import Highlight, VisibleBody, compute_night_sky
+from app.astronomy import compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
 from app.schemas import HighlightCard, ReportRequest, ReportResponse
+from app.sky import Highlight, VisibleBody
 
 # A failed narration gets one more try, after this short wait.
 NARRATION_RETRY_DELAY_SECONDS = 1.0

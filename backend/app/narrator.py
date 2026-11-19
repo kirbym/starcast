@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from anthropic import Anthropic, APIError
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from app.astronomy import Highlight, VisibleBody
+from app.sky import Highlight, VisibleBody
 
 # Structured output enforces the JSON shape because the current Sonnet rejects forced tool_choice
 # with a 400. It rejects sampling parameters too, so sampling stays at the model's default.

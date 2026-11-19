@@ -11,7 +11,6 @@ from skyfield.api import Loader, load, wgs84
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 
-from app.astronomy import EPHEMERIS_FILE, data_dir
 from app.comets import (
     _MAGNITUDE_COLUMNS,
     _NUMERIC_COLUMNS,
@@ -25,6 +24,7 @@ from app.comets import (
     _designation,
     named_comet_elements,
 )
+from app.observation import EPHEMERIS_FILE, data_dir
 from tests.conftest import PINNED_COMET_ELEMENTS
 
 NOW = datetime(2026, 11, 9, 12, tzinfo=UTC)
