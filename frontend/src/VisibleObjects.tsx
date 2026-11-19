@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { Altitude, Azimuth, LocalTime, Magnitude, RiseTime, SetTime } from './PositionalFields.tsx'
-import type { SkyObject, ViewingWindow } from './report.ts'
+import type { VisibleBody, ViewingWindow } from './report.ts'
 
 /** The Detail Layer's shared part, shown once below the cards: the night's Viewing Window, and
  * the other Visible objects with their positional fields. Objects on a card are left to the card,
@@ -11,7 +11,7 @@ export function VisibleObjects({
   objects,
 }: {
   viewingWindow: ViewingWindow
-  objects: SkyObject[]
+  objects: VisibleBody[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const headingId = useId()

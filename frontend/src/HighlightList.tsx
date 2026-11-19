@@ -1,18 +1,18 @@
 import { useId, useState } from 'react'
 import { LocalTime, PositionalFields } from './PositionalFields.tsx'
-import type { Highlight, SignificantEvent } from './report.ts'
+import type { HighlightCard, SignificantEvent } from './report.ts'
 
-export function HighlightList({ highlights }: { highlights: Highlight[] }) {
+export function HighlightList({ highlights }: { highlights: HighlightCard[] }) {
   return (
     <section className="highlights">
       {highlights.map((highlight) => (
-        <HighlightCard key={highlight.id} highlight={highlight} />
+        <Card key={highlight.id} highlight={highlight} />
       ))}
     </section>
   )
 }
 
-function HighlightCard({ highlight }: { highlight: Highlight }) {
+function Card({ highlight }: { highlight: HighlightCard }) {
   const headingId = useId()
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
@@ -25,7 +25,7 @@ function HighlightCard({ highlight }: { highlight: Highlight }) {
 
 /** The Highlight Card's Detail Layer, expanded and collapsed in place by its Details toggle.
  * Collapsed, only the toggle is rendered. */
-function DetailLayer({ highlight }: { highlight: Highlight }) {
+function DetailLayer({ highlight }: { highlight: HighlightCard }) {
   const [expanded, setExpanded] = useState(false)
   const toggleId = useId()
   const regionId = useId()

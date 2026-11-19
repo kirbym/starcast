@@ -11,6 +11,7 @@ import { setupServer } from 'msw/node'
 import { StrictMode } from 'react'
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest'
 import App from './App.tsx'
+import type { VisibleBody } from './report.ts'
 
 const REPORT_URL = 'http://api.test/api/report'
 const QUIET_NIGHT = {
@@ -570,7 +571,7 @@ test('asks where you are stargazing when the location prompt goes unanswered', a
 
 const JUPITER = {
   id: 'planet:jupiter',
-  category: 'planet_moon',
+  category: 1,
   object_type: 'planet',
   name: 'Jupiter',
   peak_altitude_degrees: 54.8,
@@ -579,7 +580,7 @@ const JUPITER = {
   sets_at: '2026-11-06T18:30:12Z',
   magnitude: -2.03,
   event: null,
-}
+} satisfies VisibleBody
 
 test('shows a Highlight Card for each Highlight, without positional numbers', async () => {
   fakeGeolocation((success) =>
@@ -621,7 +622,7 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
 
 const ANDROMEDA = {
   id: 'constellation:and',
-  category: 'constellation',
+  category: 2,
   object_type: 'constellation',
   name: 'Andromeda',
   peak_altitude_degrees: 89.7,
@@ -630,7 +631,7 @@ const ANDROMEDA = {
   sets_at: '2026-11-06T09:41:37Z',
   magnitude: null,
   event: null,
-}
+} satisfies VisibleBody
 
 test('shows a planet and a constellation Highlight Card together, in Category order', async () => {
   fakeGeolocation((success) =>
@@ -679,7 +680,7 @@ test('shows a planet and a constellation Highlight Card together, in Category or
 
 const SIRIUS = {
   id: 'bright_star:sirius',
-  category: 'featured',
+  category: 3,
   object_type: 'bright_star',
   name: 'Sirius',
   peak_altitude_degrees: 31.2,
@@ -688,7 +689,7 @@ const SIRIUS = {
   sets_at: '2026-11-06T14:57:06Z',
   magnitude: -1.44,
   event: null,
-}
+} satisfies VisibleBody
 
 test('shows up to three Highlight Cards, one per Category, in Category order', async () => {
   fakeGeolocation((success) =>
@@ -744,7 +745,7 @@ test('shows up to three Highlight Cards, one per Category, in Category order', a
 
 const GREAT_CONJUNCTION = {
   id: 'significant_event:conjunction_jupiter_saturn',
-  category: 'featured',
+  category: 3,
   object_type: 'significant_event',
   name: 'Jupiter and Saturn in conjunction',
   peak_altitude_degrees: 6.1,
@@ -758,7 +759,7 @@ const GREAT_CONJUNCTION = {
     peak_time: '2020-12-21T23:11:00Z',
     related_object_names: ['Jupiter', 'Saturn'],
   },
-}
+} satisfies VisibleBody
 
 test('shows a Significant Event Highlight Card whose Detail Layer names its bodies and peak time', async () => {
   fakeGeolocation((success) =>
@@ -807,7 +808,7 @@ test('shows a Significant Event Highlight Card whose Detail Layer names its bodi
 
 const MARS_OPPOSITION = {
   id: 'significant_event:opposition_mars',
-  category: 'featured',
+  category: 3,
   object_type: 'significant_event',
   name: 'Mars at opposition',
   peak_altitude_degrees: 49.2,
@@ -821,7 +822,7 @@ const MARS_OPPOSITION = {
     peak_time: '2020-10-14T04:55:00Z',
     related_object_names: ['Mars'],
   },
-}
+} satisfies VisibleBody
 
 test('shows an opposition Highlight Card whose Detail Layer names the event, its planet and peak time', async () => {
   fakeGeolocation((success) =>
@@ -859,7 +860,7 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
 
 const PERSEIDS = {
   id: 'significant_event:meteor_shower_per',
-  category: 'featured',
+  category: 3,
   object_type: 'significant_event',
   name: 'Perseids meteor shower',
   peak_altitude_degrees: 71.4,
@@ -873,7 +874,7 @@ const PERSEIDS = {
     peak_time: '2026-08-13T08:20:00Z',
     related_object_names: ['Perseus'],
   },
-}
+} satisfies VisibleBody
 
 test('shows a meteor shower Highlight Card whose Detail Layer names the event, its radiant and peak time', async () => {
   fakeGeolocation((success) =>
@@ -940,7 +941,7 @@ function respondWith(report: object) {
 
 const POLARIS = {
   id: 'bright_star:polaris',
-  category: 'featured',
+  category: 3,
   object_type: 'bright_star',
   name: 'Polaris',
   peak_altitude_degrees: 41.3,
@@ -950,7 +951,7 @@ const POLARIS = {
   sets_at: null,
   magnitude: 1.98,
   event: null,
-}
+} satisfies VisibleBody
 
 const THREE_CARD_NIGHT = {
   ...QUIET_NIGHT,
