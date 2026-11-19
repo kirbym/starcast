@@ -11,7 +11,7 @@ import logging
 import os
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -29,9 +29,6 @@ MAX_AGE = timedelta(days=30)
 RETRY_AFTER = timedelta(hours=1)
 _DOWNLOAD_TIMEOUT_SECONDS = 30
 
-# One comet's row of MPC orbital elements, as skyfield.data.mpc parses it.
-CometElements = pd.Series
-
 _log = logging.getLogger(__name__)
 
 
@@ -46,6 +43,31 @@ class NamedComet:
     def short_designation(self) -> str:
         """The designation without the comet's name, as in "C/2020 F3"."""
         return self.designation.split(" (")[0]
+
+
+@dataclass(frozen=True)
+class CometElements:
+    """A comet's MPC orbital elements, with the types the astronomy engine relies on.
+
+    The magnitude parameters are NaN where the MPC leaves them blank, so a comet of unknown
+    brightness is never Visible. Each field is named as Skyfield's MPC parser names its column.
+    """
+
+    designation: str
+    perihelion_year: int
+    perihelion_month: int
+    perihelion_day: float
+    perihelion_distance_au: float
+    eccentricity: float
+    argument_of_perihelion_degrees: float
+    longitude_of_ascending_node_degrees: float
+    inclination_degrees: float
+    magnitude_g: float
+    magnitude_k: float
+
+    def to_skyfield_row(self) -> pd.Series:
+        """The elements as the row skyfield.data.mpc.comet_orbit takes."""
+        return pd.Series(asdict(self))
 
 
 # Comet West and Ikeya-Seki broke apart near the Sun; each is followed by its main fragment, A.
@@ -79,6 +101,8 @@ _ORBIT_COLUMNS = (
 # Blank in some rows, so read as NaN. A comet of unknown brightness is never Visible.
 _MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
 _NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
+# All but the perihelion year and month, which are integers.
+_FLOAT_COLUMNS = _NUMERIC_COLUMNS[2:]
 # Where a row of the MPC comet format keeps the designation and name, read from Skyfield's own
 # layout of the format so the two cannot drift apart. Skyfield keeps that layout private, so if
 # it is renamed, importing this module fails rather than every Named Comet quietly going missing.
@@ -190,8 +214,7 @@ def _parse_named(content: bytes) -> dict[str, CometElements]:
     rows = _select_named_rows(content)
     if rows is None:
         return {}
-    rows = _coerce_elements(rows)
-    return {row["designation"]: row for _, row in rows.iterrows()}
+    return {elements.designation: elements for elements in _coerce_elements(rows)}
 
 
 def _select_named_rows(content: bytes) -> pd.DataFrame | None:
@@ -214,7 +237,7 @@ def _select_named_rows(content: bytes) -> pd.DataFrame | None:
         return None
 
 
-def _coerce_elements(rows: pd.DataFrame) -> pd.DataFrame:
+def _coerce_elements(rows: pd.DataFrame) -> list[CometElements]:
     """The Named Comets' parsed rows, made usable for placing them.
 
     Numeric columns become numbers, so a blank magnitude parameter becomes NaN; a row whose orbit
@@ -223,7 +246,15 @@ def _coerce_elements(rows: pd.DataFrame) -> pd.DataFrame:
     for column in _NUMERIC_COLUMNS:
         rows[column] = pd.to_numeric(rows[column], errors="coerce")
     rows = rows.dropna(subset=list(_ORBIT_COLUMNS))
-    return rows.astype({"perihelion_year": int, "perihelion_month": int})
+    return [
+        CometElements(
+            designation=row["designation"],
+            perihelion_year=int(row["perihelion_year"]),
+            perihelion_month=int(row["perihelion_month"]),
+            **{column: float(row[column]) for column in _FLOAT_COLUMNS},
+        )
+        for _, row in rows.iterrows()
+    ]
 
 
 def _designation(line: bytes) -> str:
