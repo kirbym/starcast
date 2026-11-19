@@ -2,12 +2,13 @@
 
 import datetime as dt
 import re
+from dataclasses import dataclass
 from typing import Annotated
 from zoneinfo import available_timezones
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
 
-from app.astronomy import Category, EventType, ObjectType, ViewingWindow
+from app.astronomy import ViewingWindow, VisibleBody
 
 # Whole years inside DE440s's coverage (December 1849 to January 2150).
 _EARLIEST_YEAR = 1850
@@ -38,34 +39,11 @@ class ReportRequest(BaseModel):
     location_label: str | None = None
 
 
-class SignificantEvent(BaseModel):
-    """A Significant Event Highlight's event: what happens, at its best when, and between what."""
+@dataclass(frozen=True, kw_only=True)
+class HighlightCard(VisibleBody):
+    """What the Cosmic Report shows for one Highlight: its Visible body's positional fields for
+    the Detail Layer, and the card the Narrator wrote for it."""
 
-    model_config = ConfigDict(from_attributes=True)
-
-    event_type: EventType
-    peak_time: dt.datetime
-    related_object_names: list[str] | None
-
-
-class SkyObject(BaseModel):
-    """A Visible body's raw fields: one entry of visible_objects, and what the Narrator is given."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    category: Category
-    object_type: ObjectType
-    name: str
-    peak_altitude_degrees: float
-    azimuth_at_peak_degrees: float
-    rises_at: dt.datetime | None
-    sets_at: dt.datetime | None
-    magnitude: float | None
-    event: SignificantEvent | None
-
-
-class Highlight(SkyObject):
     mini_headline: str
     paragraph: str
 
@@ -73,5 +51,5 @@ class Highlight(SkyObject):
 class ReportResponse(BaseModel):
     headline: str
     viewing_window: ViewingWindow
-    highlights: list[Highlight]
-    visible_objects: list[SkyObject]
+    highlights: list[HighlightCard]
+    visible_objects: list[VisibleBody]
