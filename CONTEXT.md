@@ -18,6 +18,10 @@ _Avoid_: "supported", "tracked", "available"
 A catalog body whose center point (or centroid, for extended objects) reaches a positive altitude at some moment during the Viewing Window for the observer's location. Visibility is a binary per-night determination; it does not imply naked-eye detectability or any minimum brightness threshold. The one exception is a Named Comet, which must also reach magnitude 6.0.
 _Avoid_: "up", "observable", "detectable"
 
+**Visible body**:
+A catalog body that is Visible on a given night, together with where and when to look for it: its Peak Altitude, its azimuth at that peak, its rise and set times, and its magnitude. A Significant Event Highlight takes the same form, its positional data saying where and when to look for the event. The single list of Visible objects in the Detail Layer is a list of Visible bodies.
+_Avoid_: "sky object", "visible object" (as a name), "body" alone
+
 **Peak Altitude**:
 The maximum altitude (degrees above the horizon) an object reaches during the Viewing Window. Used for ranking candidates within a category and surfaced in the detail layer.
 _Avoid_: "maximum elevation", "culmination altitude"
@@ -33,8 +37,8 @@ A single celestial body (or Significant Event) selected as one of up to three fe
 _Avoid_: "feature", "pick", "selection"
 
 **Category**:
-One of three fixed slots that structure Highlight selection: (1) Planet or Moon, (2) Constellation, (3) Bright Star / Comet / Nebula / Galaxy / Significant Event. A Category is omitted from the report if no qualifying Visible body exists for it that night.
-_Avoid_: "slot", "type", "group"
+One of three fixed slots that structure Highlight selection: (1) Planet or Moon, (2) Constellation, (3) Bright Star / Comet / Nebula / Galaxy / Significant Event. A Category is omitted from the report if no qualifying Visible body exists for it that night. Categories are named by their number: Category 1, Category 2, Category 3.
+_Avoid_: "slot", "type", "group", "featured" (for Category 3)
 
 **Significant Event**:
 A time-sensitive astronomical occurrence detected for the current night: a conjunction (two eligible bodies within 2.0° of each other at their closest approach while both are above the horizon), a planetary opposition (a Visible superior Planet, Mars through Neptune, whose exact opposition falls on that night or a night either side, each night running from local noon to local noon), or a meteor shower within 2 days of its predicted peak with ZHR ≥ 20 (never a daytime shower, nor one that favours the observer's other hemisphere, and only while its radiant clears the horizon during the Viewing Window). A Significant Event takes priority over a standing catalog body when filling Category 3; if more than one qualifies the same night, only one is used, chosen by event type: conjunction, then opposition, then meteor shower. Among several qualifying meteor showers, the highest ZHR wins.
@@ -56,7 +60,7 @@ A single punchy sentence that captures the most striking thing about the night's
 _Avoid_: "title", "lede", "summary"
 
 **Highlight Card**:
-One entry in the Cosmic Report corresponding to one Highlight. Contains a mini-headline and a 2–4 sentence paragraph written in a conversational tone with poetic flourishes.
+One entry in the Cosmic Report corresponding to one Highlight. Contains a mini-headline and a 2–4 sentence paragraph written in a conversational tone with poetic flourishes, and carries its Highlight's positional data, which the Detail Layer reveals when the card is expanded. A Highlight is what was selected; a Highlight Card is what the Cosmic Report shows for it.
 _Avoid_: "card", "entry", "story", "highlight story"
 
 **Quiet Night**:

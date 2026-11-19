@@ -1,4 +1,4 @@
-import type { SkyObject } from './report.ts'
+import type { VisibleBody } from './report.ts'
 
 /** The moment in the browser's time zone, like "3:11 PM". Reports are requested for that same
  * zone (see report.ts), so it is the zone the night was computed for. */
@@ -49,7 +49,7 @@ export function SetTime({ moment }: { moment: string | null }) {
 }
 
 /** A body's positional fields, as rows of a description list. */
-export function PositionalFields({ body }: { body: SkyObject }) {
+export function PositionalFields({ body }: { body: VisibleBody }) {
   return (
     <>
       <dt>Peak altitude</dt>

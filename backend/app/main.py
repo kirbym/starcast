@@ -1,6 +1,7 @@
 import logging
 import os
 from collections.abc import Awaitable, Callable
+from dataclasses import fields
 from time import sleep
 from typing import Annotated
 
@@ -9,9 +10,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.astronomy import compute_night_sky
+from app.astronomy import Highlight, VisibleBody, compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
-from app.schemas import Highlight, ReportRequest, ReportResponse, SkyObject
+from app.schemas import HighlightCard, ReportRequest, ReportResponse
 
 # A failed narration gets one more try, after this short wait.
 NARRATION_RETRY_DELAY_SECONDS = 1.0
@@ -79,34 +80,27 @@ def create_report(
         report_request.timezone,
         report_request.date,
     )
-    highlights = [SkyObject.model_validate(body) for body in sky.highlights]
-    narrator_input = [
-        {**highlight.model_dump(mode="json"), "context": body.context}
-        for highlight, body in zip(highlights, sky.highlights, strict=True)
-    ]
     try:
-        headline, cards = _narrate(narrator, narrator_input, highlights)
+        headline, cards = _narrate(narrator, sky.highlights)
     except NarrationError as first_failure:
         logger.warning("Narration failed, retrying once: %s", first_failure)
         sleep(NARRATION_RETRY_DELAY_SECONDS)
-        headline, cards = _narrate(narrator, narrator_input, highlights)
+        headline, cards = _narrate(narrator, sky.highlights)
     return ReportResponse(
         headline=headline,
         viewing_window=sky.viewing_window,
         highlights=cards,
-        visible_objects=[SkyObject.model_validate(body) for body in sky.visible_objects],
+        visible_objects=sky.visible_objects,
     )
 
 
-def _narrate(
-    narrator: Narrator, narrator_input: list[dict], highlights: list[SkyObject]
-) -> tuple[str, list[Highlight]]:
-    """One narration attempt: the Headline, and the Highlights with their cards attached."""
-    narration = narrator.narrate(narrator_input)
-    return narration.headline, _merge_cards(highlights, narration)
+def _narrate(narrator: Narrator, highlights: list[Highlight]) -> tuple[str, list[HighlightCard]]:
+    """One narration attempt: the Headline, and a Highlight Card for each Highlight."""
+    narration = narrator.narrate(highlights)
+    return narration.headline, _merge_cards([highlight.body for highlight in highlights], narration)
 
 
-def _merge_cards(highlights: list[SkyObject], narration: Narration) -> list[Highlight]:
+def _merge_cards(highlights: list[VisibleBody], narration: Narration) -> list[HighlightCard]:
     """Attach each card to the Highlight with its id, so prose never lands on the wrong body.
 
     Every Highlight must get exactly one card, and every card must belong to a Highlight.
@@ -119,8 +113,8 @@ def _merge_cards(highlights: list[SkyObject], narration: Narration) -> list[High
             f"{highlight_ids}"
         )
     return [
-        Highlight(
-            **highlight.model_dump(),
+        HighlightCard(
+            **{field.name: getattr(highlight, field.name) for field in fields(highlight)},
             mini_headline=cards[highlight.id].mini_headline,
             paragraph=cards[highlight.id].paragraph,
         )

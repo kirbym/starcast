@@ -46,6 +46,8 @@ uv run pytest tests/test_astronomy.py::test_name       # single test
 
 `app/data/messier.csv` (the 110 Messier DSOs, from OpenNGC under CC BY-SA 4.0) is generated as well. Regenerate it with `uv run scripts/build_messier.py`, which downloads its pinned sources to `.cache/catalog-sources`, and see `docs/research/messier-catalog.md`.
 
+The API's shapes are declared once, in the backend (`VisibleBody` and friends in `app/astronomy.py`, `ReportResponse` in `app/schemas.py`). The frontend's types are generated from them, not hand-edited: after changing a shape, run `uv run scripts/export_openapi.py` (writes `frontend/src/api/openapi.json`), then `npm run gen:api` from `frontend/` (writes `frontend/src/api/schema.gen.ts`). A backend test and a frontend test each fail while their generated file is stale.
+
 `app/data/meteor_showers.csv` (the meteor shower calendar, from the IMO Meteor Shower Calendar) is hand-maintained, not generated. Update it from each year's IMO calendar, and see `docs/research/meteor-shower-calendar.md`.
 
 The first astronomy run downloads the DE440s ephemeris (~32 MB) to `backend/.cache/skyfield`, or to `STARCAST_DATA_DIR` if set.

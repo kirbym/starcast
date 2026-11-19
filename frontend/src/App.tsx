@@ -14,7 +14,7 @@ import {
   ReportError,
   type CosmicReport,
   type ReportErrorType,
-  type SkyObject,
+  type VisibleBody,
 } from './report.ts'
 import ReportSkeleton from './ReportSkeleton.tsx'
 import Toast from './Toast.tsx'
@@ -194,7 +194,7 @@ function tryAgainMessage(type: ReportErrorType, { label }: Location): string {
 }
 
 /** The Visible objects without a Highlight Card: a highlighted object's details are on its card. */
-function notHighlighted({ highlights, visible_objects }: CosmicReport): SkyObject[] {
+function notHighlighted({ highlights, visible_objects }: CosmicReport): VisibleBody[] {
   const onCards = new Set(highlights.map((highlight) => highlight.id))
   return visible_objects.filter((body) => !onCards.has(body.id))
 }

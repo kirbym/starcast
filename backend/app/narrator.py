@@ -1,12 +1,15 @@
 """The Narrator: turns the night's Highlights into the prose of a Cosmic Report."""
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
+from dataclasses import fields
 from functools import lru_cache
 from typing import Any, Protocol
 
 from anthropic import Anthropic, APIError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
+
+from app.astronomy import Highlight, VisibleBody
 
 # Structured output enforces the JSON shape because the current Sonnet rejects forced tool_choice
 # with a 400. It rejects sampling parameters too, so sampling stays at the model's default.
@@ -23,13 +26,15 @@ BANNED_PHRASES = (
     "shining bright",
 )
 
+# The raw fields of each Highlight the Narrator is given: a Visible body's, then its context.
+HIGHLIGHT_FIELDS = (*(field.name for field in fields(VisibleBody)), "context")
+
 SYSTEM_PROMPT = f"""\
 You write StarCast's Cosmic Report: a short, personal report on what is really in one observer's
 sky tonight, told by a friend who knows astronomy and still finds it wonderful.
 
 The user message is a JSON array of 0 to 3 Highlights, the bodies or events chosen for tonight.
-Each has raw fields: id, category, object_type, name, peak_altitude_degrees,
-azimuth_at_peak_degrees, rises_at, sets_at, magnitude, event and context.
+Each has raw fields: {", ".join(HIGHLIGHT_FIELDS[:-1])} and {HIGHLIGHT_FIELDS[-1]}.
 
 context is null or an object of catalog facts about the body. For a Bright Star it gives the
 Bayer designation, the constellation, the spectral type, the B-V colour index and the distance in
@@ -45,7 +50,7 @@ The full Moon spans about 30 arcminutes, so compare the size with it, in words. 
 than about magnitude 6 needs dark skies and binoculars or a small telescope; say so plainly rather
 than promising a naked-eye view.
 
-For a Named Comet (object_type "comet") context gives its designation and the date of the
+For a Named Comet (object_type "named_comet") context gives its designation and the date of the
 perihelion passage, its closest swing past the Sun. Compare that date with the night's rises_at or
 sets_at to tell whether the comet is heading in toward the Sun or already outbound, in words. A
 comet is a rare visitor rather than a fixture of the sky, so say what makes this one special
@@ -139,7 +144,15 @@ class NarrationError(Exception):
 
 
 class Narrator(Protocol):
-    def narrate(self, highlights: Sequence[Mapping[str, Any]]) -> Narration: ...
+    def narrate(self, highlights: Sequence[Highlight]) -> Narration: ...
+
+
+_VISIBLE_BODY = TypeAdapter(VisibleBody)
+
+
+def _highlight_json(highlight: Highlight) -> dict[str, Any]:
+    """One Highlight as Claude reads it: the Visible body's raw fields, then its context."""
+    return {**_VISIBLE_BODY.dump_python(highlight.body, mode="json"), "context": highlight.context}
 
 
 class ClaudeNarrator:
@@ -147,14 +160,21 @@ class ClaudeNarrator:
         # Retrying is the endpoint's job, and the spec allows it only once.
         self._client = client or Anthropic(max_retries=0)
 
-    def narrate(self, highlights: Sequence[Mapping[str, Any]]) -> Narration:
+    def narrate(self, highlights: Sequence[Highlight]) -> Narration:
         """Narrate the Highlights, raising NarrationError when Claude fails or replies unusably."""
         try:
             response = self._client.beta.messages.create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": json.dumps(list(highlights))}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            [_highlight_json(highlight) for highlight in highlights]
+                        ),
+                    }
+                ],
                 output_config={"format": {"type": "json_schema", "schema": NARRATION_SCHEMA}},
                 # Sonnet thinks by default. Off saves tokens, and thinking counts against
                 # MAX_TOKENS.

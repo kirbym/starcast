@@ -38,15 +38,17 @@ COMET_MAGNITUDE_LIMIT = 6.0
 # Two bodies at most this far apart, both above the horizon at that moment, are in conjunction.
 CONJUNCTION_LIMIT_DEGREES = 2.0
 
-Category = Literal["planet_moon", "constellation", "featured"]
+# Named by number, as CONTEXT.md names them: 1 Planet or Moon, 2 Named Constellation, 3 Bright
+# Star, Named Comet, DSO or Significant Event.
+Category = Literal[1, 2, 3]
 ObjectType = Literal[
-    "planet", "moon", "constellation", "bright_star", "comet", "dso", "significant_event"
+    "planet", "moon", "constellation", "bright_star", "named_comet", "dso", "significant_event"
 ]
 EventType = Literal["conjunction", "opposition", "meteor_shower"]
 Hemisphere = Literal["north", "south"]
 
 # The bodies that move against the stars. Only they can start a conjunction.
-_MOVING_TYPES = frozenset({"planet", "moon", "comet"})
+_MOVING_TYPES = frozenset({"planet", "moon", "named_comet"})
 # The Planets beyond Earth's orbit, by catalog key. Only they can stand opposite the Sun.
 _SUPERIOR_PLANETS = frozenset({"mars", "jupiter", "saturn", "uranus", "neptune"})
 # Skyfield's almanac.oppositions_conjunctions() code for "opposite the Sun".
@@ -58,12 +60,12 @@ SHOWER_ZHR_LIMIT = 20
 
 
 _CATEGORIES: dict[ObjectType, Category] = {
-    "planet": "planet_moon",
-    "moon": "planet_moon",
-    "constellation": "constellation",
-    "bright_star": "featured",
-    "comet": "featured",
-    "dso": "featured",
+    "planet": 1,
+    "moon": 1,
+    "constellation": 2,
+    "bright_star": 3,
+    "named_comet": 3,
+    "dso": 3,
 }
 
 # Catalog facts about a body that the Narrator can draw on, like a star's spectral type.
@@ -140,7 +142,7 @@ class Catalog:
     planets_and_moon: tuple[CatalogBody, ...]
     constellations: tuple[CatalogBody, ...]
     # The standing Category 3 candidates: the Bright Stars, Named Comets and DSOs.
-    featured: tuple[CatalogBody, ...]
+    category_3: tuple[CatalogBody, ...]
     meteor_showers: tuple[MeteorShower, ...]
 
 
@@ -266,7 +268,7 @@ def _named_comets() -> tuple[CatalogBody, ...]:
     """The Named Comets. Their magnitude, like their position, is computed for the night."""
     return tuple(
         CatalogBody(
-            "comet",
+            "named_comet",
             comet.key,
             comet.name,
             comet,
@@ -328,7 +330,7 @@ def _hemisphere(value: str) -> Hemisphere | None:
 CATALOG = Catalog(
     planets_and_moon=_SOLAR_SYSTEM,
     constellations=_load_constellations(),
-    featured=_load_bright_stars() + _named_comets() + _load_dsos(),
+    category_3=_load_bright_stars() + _named_comets() + _load_dsos(),
     meteor_showers=_load_meteor_showers(),
 )
 
@@ -371,14 +373,21 @@ class VisibleBody:
     sets_at: datetime | None
     magnitude: float | None
     event: SignificantEvent | None = None
-    # Narration-only facts from the catalog; not part of the API's positional fields.
+
+
+@dataclass(frozen=True)
+class Highlight:
+    """One of the night's Highlights: the Visible body selected for its Category, and the
+    narration-only facts about it, like a star's spectral type or a conjunction's separation."""
+
+    body: VisibleBody
     context: NarrationContext | None = None
 
 
 @dataclass(frozen=True)
 class NightSky:
     viewing_window: ViewingWindow
-    highlights: list[VisibleBody] = field(default_factory=list)
+    highlights: list[Highlight] = field(default_factory=list)
     visible_objects: list[VisibleBody] = field(default_factory=list)
 
 
@@ -412,18 +421,24 @@ def compute_night_sky(
     samples = _sample_times(window)
     planets_and_moon = _observe_visible(catalog.planets_and_moon, observer, samples)
     constellations = _observe_visible(catalog.constellations, observer, samples)
-    featured = _observe_visible(catalog.featured, observer, samples, _comet_elements(catalog))
+    category_3_bodies = _observe_visible(
+        catalog.category_3, observer, samples, _comet_elements(catalog)
+    )
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
     night = _Night(observer, latitude, local_noon, samples)
-    category_3 = _category_3_highlight(planets_and_moon + featured, night, catalog.meteor_showers)
-    highlights = [seen.body for seen in (category_1, category_2) if seen]
+    category_3 = _category_3_highlight(
+        planets_and_moon + category_3_bodies, night, catalog.meteor_showers
+    )
+    highlights = [seen.highlight for seen in (category_1, category_2) if seen]
     if category_3:
         highlights.append(category_3)
     return NightSky(
         viewing_window=window,
         highlights=highlights,
-        visible_objects=[seen.body for seen in planets_and_moon + constellations + featured],
+        visible_objects=[
+            seen.body for seen in planets_and_moon + constellations + category_3_bodies
+        ],
     )
 
 
@@ -452,6 +467,11 @@ class _Observation:
     body: VisibleBody
     peak_time: Time
     track: _Track
+    context: NarrationContext | None
+
+    @property
+    def highlight(self) -> Highlight:
+        return Highlight(self.body, self.context)
 
 
 def _observe_visible(
@@ -491,30 +511,30 @@ def _observe_named_comet(
 
 def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
     """The Named Comets' orbital elements, if the catalog has any Named Comets to place."""
-    if not any(isinstance(body.target, NamedComet) for body in catalog.featured):
+    if not any(isinstance(body.target, NamedComet) for body in catalog.category_3):
         return {}
     return named_comet_elements(data_dir())
 
 
 def _category_3_highlight(
     observed: list[_Observation], night: _Night, showers: tuple[MeteorShower, ...]
-) -> VisibleBody | None:
+) -> Highlight | None:
     """Category 3: a Significant Event wins outright; otherwise the best standing body.
 
     `observed` is every Visible body of the night outside Category 2. The standing candidates
-    among them are the featured ones: the Bright Stars, Named Comets and DSOs.
+    among them are the Category 3 bodies: the Bright Stars, Named Comets and DSOs.
     """
     event = _significant_event(observed, night, showers)
     if event:
         return event
-    standing = [seen for seen in observed if seen.body.category == "featured"]
+    standing = [seen for seen in observed if seen.body.category == 3]
     best = max(standing, key=_category_3_priority, default=None)
-    return best.body if best else None
+    return best.highlight if best else None
 
 
 def _significant_event(
     observed: list[_Observation], night: _Night, showers: tuple[MeteorShower, ...]
-) -> VisibleBody | None:
+) -> Highlight | None:
     """The night's one Significant Event Highlight.
 
     When several qualify, a fixed event-type priority decides:
@@ -528,7 +548,7 @@ def _significant_event(
     )
 
 
-def _tightest_conjunction(observed: list[_Observation], samples: Time) -> VisibleBody | None:
+def _tightest_conjunction(observed: list[_Observation], samples: Time) -> Highlight | None:
     """The night's tightest conjunction, or None if there is none."""
     tightest = min(
         _conjunctions(observed, samples), key=lambda found: found.separation_degrees, default=None
@@ -539,7 +559,7 @@ def _tightest_conjunction(observed: list[_Observation], samples: Time) -> Visibl
 @dataclass(frozen=True)
 class _Conjunction:
     separation_degrees: float
-    highlight: VisibleBody
+    highlight: Highlight
 
 
 def _conjunctions(observed: list[_Observation], samples: Time) -> list[_Conjunction]:
@@ -575,9 +595,9 @@ def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _C
     if separation > CONJUNCTION_LIMIT_DEGREES:
         return None
     pair = (first.body, second.body)
-    highlight = VisibleBody(
+    body = VisibleBody(
         id=f"significant_event:conjunction_{first.catalog_body.key}_{second.catalog_body.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{first.body.name} and {second.body.name} in conjunction",
         # The pair stands within a couple of degrees of the first body: look there.
@@ -592,12 +612,12 @@ def _conjunction(first: _Observation, second: _Observation, samples: Time) -> _C
             peak_time=_to_utc(samples[closest]),
             related_object_names=(first.body.name, second.body.name),
         ),
-        context={"separation_degrees": round(separation, 2)},
     )
+    highlight = Highlight(body, context={"separation_degrees": round(separation, 2)})
     return _Conjunction(separation, highlight)
 
 
-def _opposition(observed: list[_Observation], local_noon: datetime) -> VisibleBody | None:
+def _opposition(observed: list[_Observation], local_noon: datetime) -> Highlight | None:
     """The first Visible superior Planet, in catalog order, within a night of its opposition.
 
     The Planets inside Earth's orbit never reach opposition, so Mercury and Venus are never
@@ -628,13 +648,13 @@ def _opposition_moment(body: CatalogBody, local_noon: datetime) -> Time | None:
     )
 
 
-def _opposition_highlight(seen: _Observation, moment: Time) -> VisibleBody:
+def _opposition_highlight(seen: _Observation, moment: Time) -> Highlight:
     """The opposition's Highlight: the Planet itself, best seen at its Peak Altitude."""
     planet = seen.body
-    return replace(
+    body = replace(
         planet,
         id=f"significant_event:opposition_{seen.catalog_body.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{planet.name} at opposition",
         event=SignificantEvent(
@@ -642,13 +662,11 @@ def _opposition_highlight(seen: _Observation, moment: Time) -> VisibleBody:
             peak_time=_to_utc(seen.peak_time),
             related_object_names=(planet.name,),
         ),
-        context={"opposition_time": _to_utc(moment).isoformat()},
     )
+    return Highlight(body, context={"opposition_time": _to_utc(moment).isoformat()})
 
 
-def _strongest_meteor_shower(
-    showers: tuple[MeteorShower, ...], night: _Night
-) -> VisibleBody | None:
+def _strongest_meteor_shower(showers: tuple[MeteorShower, ...], night: _Night) -> Highlight | None:
     """The qualifying meteor shower with the highest ZHR whose radiant clears the horizon during the
     Viewing Window."""
     night_date = night.local_noon.date()
@@ -685,7 +703,7 @@ def _nearest_peak(shower: MeteorShower, night_date: date) -> date:
     return min(peaks, key=lambda peak: abs(peak - night_date))
 
 
-def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> VisibleBody | None:
+def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> Highlight | None:
     """The shower's Highlight, placed at its radiant, or None if the radiant never rises tonight.
 
     Meteors stream from the radiant, and the higher it stands the more of them are seen, so the
@@ -703,9 +721,9 @@ def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> VisibleBody
     }
     if shower.zhr_note:
         context["zhr_note"] = shower.zhr_note
-    return VisibleBody(
+    body = VisibleBody(
         id=f"significant_event:meteor_shower_{shower.key}",
-        category="featured",
+        category=3,
         object_type="significant_event",
         name=f"{shower.name} meteor shower",
         peak_altitude_degrees=peak.altitude_degrees,
@@ -718,8 +736,8 @@ def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> VisibleBody
             peak_time=_to_utc(peak.time),
             related_object_names=(shower.radiant_constellation,),
         ),
-        context=context,
     )
+    return Highlight(body, context)
 
 
 def _category_3_priority(seen: _Observation) -> tuple[float, float]:
@@ -770,7 +788,7 @@ def _observe(body: CatalogBody, observer, samples: Time) -> _Observation | None:
         return None
     magnitude = _magnitude(body, observer, target, peak.time)
     visible = _visible_body(body, observer, target, peak, magnitude)
-    return _Observation(body, visible, peak.time, track)
+    return _Observation(body, visible, peak.time, track, body.context)
 
 
 def _observe_comet(
@@ -793,7 +811,7 @@ def _observe_comet(
         return None
     visible = _visible_body(body, observer, target, peak, magnitude)
     context = {**(body.context or {}), "perihelion_date": _perihelion_date(elements)}
-    return _Observation(body, replace(visible, context=context), peak.time, track)
+    return _Observation(body, visible, peak.time, track, context)
 
 
 @dataclass(frozen=True)
@@ -838,7 +856,6 @@ def _visible_body(
         rises_at=_rising_before(observer, target, peak.time),
         sets_at=_setting_after(observer, target, peak.time),
         magnitude=magnitude,
-        context=body.context,
     )
 
 

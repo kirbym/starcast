@@ -1,43 +1,23 @@
+import type { components } from './api/schema.gen.ts'
 import type { Location } from './location.ts'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-export type SignificantEvent = {
-  event_type: 'conjunction' | 'opposition' | 'meteor_shower'
-  peak_time: string
-  related_object_names: string[] | null
-}
+/** The shapes on the wire, generated from the backend's OpenAPI document by `npm run gen:api`. */
+type Schemas = components['schemas']
 
-/** A Visible body and its positional fields: one entry of `visible_objects`. */
-export type SkyObject = {
-  id: string
-  name: string
-  peak_altitude_degrees: number
-  azimuth_at_peak_degrees: number
-  /** Null when the body never set before its peak, so it doesn't rise tonight. */
-  rises_at: string | null
-  /** Null when the body stays up after its peak, so it doesn't set tonight. */
-  sets_at: string | null
-  magnitude: number | null
-  event: SignificantEvent | null
-}
+export type SignificantEvent = Schemas['SignificantEvent']
 
-export type Highlight = SkyObject & {
-  mini_headline: string
-  paragraph: string
-}
+/** A Visible body and its positional fields: one entry of `visible_objects`. `rises_at` is null
+ * when the body never set before its peak, and `sets_at` when it stays up after it. */
+export type VisibleBody = Schemas['VisibleBody']
 
-export type ViewingWindow = {
-  starts_at: string
-  ends_at: string
-}
+/** What the Cosmic Report shows for one Highlight: its Visible body, mini-headline and paragraph. */
+export type HighlightCard = Schemas['HighlightCard']
 
-export type CosmicReport = {
-  headline: string
-  viewing_window: ViewingWindow
-  highlights: Highlight[]
-  visible_objects: SkyObject[]
-}
+export type ViewingWindow = Schemas['ViewingWindow']
+
+export type CosmicReport = Schemas['ReportResponse']
 
 function localDate(now: Date): string {
   const year = now.getFullYear()

@@ -50,9 +50,9 @@ class FakeNarrator:
         if cards is None:
             cards = [
                 NarrationCard(
-                    id=highlight["id"],
-                    mini_headline=f"{highlight['name']} takes the stage",
-                    paragraph=f"A story about {highlight['name']}.",
+                    id=highlight.body.id,
+                    mini_headline=f"{highlight.body.name} takes the stage",
+                    paragraph=f"A story about {highlight.body.name}.",
                 )
                 for highlight in self.received
             ]
@@ -189,7 +189,7 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     [highlight, _constellation, _star] = response.json()["highlights"]
     assert set(highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert highlight["id"] == "planet:jupiter"
-    assert highlight["category"] == "planet_moon"
+    assert highlight["category"] == 1
     assert highlight["object_type"] == "planet"
     assert highlight["name"] == "Jupiter"
     assert highlight["mini_headline"] == "Jupiter takes the stage"
@@ -205,7 +205,7 @@ def test_one_highlight_card_per_category_is_narrated_in_category_order(client: T
     [planet, constellation, star] = response.json()["highlights"]
     assert planet["id"] == "planet:jupiter"
     assert constellation["id"] == "constellation:and"
-    assert constellation["category"] == "constellation"
+    assert constellation["category"] == 2
     assert constellation["object_type"] == "constellation"
     assert constellation["name"] == "Andromeda"
     assert constellation["magnitude"] is None
@@ -213,7 +213,7 @@ def test_one_highlight_card_per_category_is_narrated_in_category_order(client: T
     assert constellation["paragraph"] == "A story about Andromeda."
     assert set(star) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert star["id"] == "bright_star:sirius"
-    assert star["category"] == "featured"
+    assert star["category"] == 3
     assert star["object_type"] == "bright_star"
     assert star["name"] == "Sirius"
     assert star["magnitude"] == pytest.approx(-1.44)
@@ -243,17 +243,16 @@ def test_highlight_cards_are_merged_by_id_whatever_order_the_narrator_returns_th
     ]
 
 
-def test_narrator_receives_raw_fields_of_each_highlight(client: TestClient, narrator: FakeNarrator):
+def test_narrator_receives_each_highlight_in_category_order(
+    client: TestClient, narrator: FakeNarrator
+):
     client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
-    assert [received["id"] for received in narrator.received] == [
+    assert [received.body.id for received in narrator.received] == [
         "planet:jupiter",
         "constellation:and",
         "bright_star:sirius",
     ]
-    for received in narrator.received:
-        assert set(received) == POSITIONAL_FIELDS | {"context"}
-        assert isinstance(received["rises_at"], str)
 
 
 def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
@@ -262,9 +261,9 @@ def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
     client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     planet, constellation, star = narrator.received
-    assert planet["context"] is None
-    assert constellation["context"] is None
-    context = star["context"]
+    assert planet.context is None
+    assert constellation.context is None
+    context = star.context
     assert context["bayer_designation"] == "α CMa"
     assert context["constellation"] == "Canis Major"
     assert context["spectral_type"].startswith("A0")
@@ -285,12 +284,12 @@ def test_every_visible_body_is_listed_with_highlights_included(client: TestClien
     assert "constellation:cru" not in ids
     assert "bright_star:canopus" not in ids
     categories = {
-        "planet": "planet_moon",
-        "moon": "planet_moon",
-        "constellation": "constellation",
-        "bright_star": "featured",
-        "comet": "featured",
-        "dso": "featured",
+        "planet": 1,
+        "moon": 1,
+        "constellation": 2,
+        "bright_star": 3,
+        "named_comet": 3,
+        "dso": 3,
     }
     for body in visible:
         assert set(body) == POSITIONAL_FIELDS
@@ -305,9 +304,11 @@ def test_bright_named_comet_is_listed_with_its_computed_magnitude(client: TestCl
     response = client.post("/api/report", json={**VALID_REQUEST, "date": "2020-07-20"})
 
     assert response.status_code == 200
-    comets = [body for body in response.json()["visible_objects"] if body["object_type"] == "comet"]
-    assert [comet["id"] for comet in comets] == ["comet:neowise"]
-    assert comets[0]["category"] == "featured"
+    comets = [
+        body for body in response.json()["visible_objects"] if body["object_type"] == "named_comet"
+    ]
+    assert [comet["id"] for comet in comets] == ["named_comet:neowise"]
+    assert comets[0]["category"] == 3
     assert comets[0]["name"] == "Comet NEOWISE"
     assert comets[0]["magnitude"] < 6.0
 
@@ -325,7 +326,7 @@ def test_conjunction_highlight_carries_its_event_with_a_stable_id(client: TestCl
     assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert event_highlight["id"] == "significant_event:conjunction_jupiter_saturn"
     assert again.json()["highlights"][-1]["id"] == event_highlight["id"]
-    assert event_highlight["category"] == "featured"
+    assert event_highlight["category"] == 3
     assert event_highlight["object_type"] == "significant_event"
     assert event_highlight["name"] == "Jupiter and Saturn in conjunction"
     assert event_highlight["mini_headline"] == "Jupiter and Saturn in conjunction takes the stage"
@@ -342,11 +343,10 @@ def test_narrator_receives_the_conjunction_event_and_its_separation(
     client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:conjunction_jupiter_saturn"
-    assert received["event"]["event_type"] == "conjunction"
-    assert received["event"]["related_object_names"] == ["Jupiter", "Saturn"]
-    assert isinstance(received["event"]["peak_time"], str)
-    assert received["context"]["separation_degrees"] == pytest.approx(0.10, abs=0.01)
+    assert received.body.id == "significant_event:conjunction_jupiter_saturn"
+    assert received.body.event.event_type == "conjunction"
+    assert received.body.event.related_object_names == ("Jupiter", "Saturn")
+    assert received.context["separation_degrees"] == pytest.approx(0.10, abs=0.01)
 
 
 def test_conjunction_is_a_highlight_but_not_a_visible_object(client: TestClient):
@@ -368,7 +368,7 @@ def test_opposition_highlight_carries_its_event(client: TestClient):
     event_highlight = response.json()["highlights"][-1]
     assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert event_highlight["id"] == "significant_event:opposition_mars"
-    assert event_highlight["category"] == "featured"
+    assert event_highlight["category"] == 3
     assert event_highlight["object_type"] == "significant_event"
     assert event_highlight["name"] == "Mars at opposition"
     event = event_highlight["event"]
@@ -383,9 +383,9 @@ def test_narrator_receives_the_opposition_event_and_its_exact_moment(
     client.post("/api/report", json=MARS_OPPOSITION_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:opposition_mars"
-    assert received["event"]["event_type"] == "opposition"
-    assert received["context"]["opposition_time"].startswith("2020-10-13T23:2")
+    assert received.body.id == "significant_event:opposition_mars"
+    assert received.body.event.event_type == "opposition"
+    assert received.context["opposition_time"].startswith("2020-10-13T23:2")
 
 
 # New York on 2026-08-12: the Perseids peak.
@@ -399,7 +399,7 @@ def test_meteor_shower_highlight_carries_its_event(client: TestClient):
     event_highlight = response.json()["highlights"][-1]
     assert set(event_highlight) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
     assert event_highlight["id"] == "significant_event:meteor_shower_per"
-    assert event_highlight["category"] == "featured"
+    assert event_highlight["category"] == 3
     assert event_highlight["object_type"] == "significant_event"
     assert event_highlight["name"] == "Perseids meteor shower"
     assert event_highlight["magnitude"] is None
@@ -415,11 +415,11 @@ def test_narrator_receives_the_meteor_shower_and_its_catalog_facts(
     client.post("/api/report", json=PERSEIDS_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:meteor_shower_per"
-    assert received["event"]["event_type"] == "meteor_shower"
-    assert received["context"]["zhr"] == 100
-    assert received["context"]["peak_date"] == "2026-08-12"
-    assert received["context"]["parent_body"] == "109P/Swift-Tuttle"
+    assert received.body.id == "significant_event:meteor_shower_per"
+    assert received.body.event.event_type == "meteor_shower"
+    assert received.context["zhr"] == 100
+    assert received.context["peak_date"] == "2026-08-12"
+    assert received.context["parent_body"] == "109P/Swift-Tuttle"
 
 
 @pytest.mark.parametrize(

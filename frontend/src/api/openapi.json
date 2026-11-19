@@ -1,0 +1,475 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "StarCast API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report": {
+      "post": {
+        "summary": "Create Report",
+        "operationId": "create_report_api_report_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HighlightCard": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "category": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Category"
+          },
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "planet",
+              "moon",
+              "constellation",
+              "bright_star",
+              "named_comet",
+              "dso",
+              "significant_event"
+            ],
+            "title": "Object Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "peak_altitude_degrees": {
+            "type": "number",
+            "title": "Peak Altitude Degrees"
+          },
+          "azimuth_at_peak_degrees": {
+            "type": "number",
+            "title": "Azimuth At Peak Degrees"
+          },
+          "rises_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rises At"
+          },
+          "sets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sets At"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Magnitude"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignificantEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mini_headline": {
+            "type": "string",
+            "title": "Mini Headline"
+          },
+          "paragraph": {
+            "type": "string",
+            "title": "Paragraph"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "object_type",
+          "name",
+          "peak_altitude_degrees",
+          "azimuth_at_peak_degrees",
+          "rises_at",
+          "sets_at",
+          "magnitude",
+          "mini_headline",
+          "paragraph"
+        ],
+        "title": "HighlightCard",
+        "description": "What the Cosmic Report shows for one Highlight: its Visible body's positional fields for\nthe Detail Layer, and the card the Narrator wrote for it."
+      },
+      "ReportRequest": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "location_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "timezone",
+          "date"
+        ],
+        "title": "ReportRequest"
+      },
+      "ReportResponse": {
+        "properties": {
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "viewing_window": {
+            "$ref": "#/components/schemas/ViewingWindow"
+          },
+          "highlights": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightCard"
+            },
+            "type": "array",
+            "title": "Highlights"
+          },
+          "visible_objects": {
+            "items": {
+              "$ref": "#/components/schemas/VisibleBody"
+            },
+            "type": "array",
+            "title": "Visible Objects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "headline",
+          "viewing_window",
+          "highlights",
+          "visible_objects"
+        ],
+        "title": "ReportResponse"
+      },
+      "SignificantEvent": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "conjunction",
+              "opposition",
+              "meteor_shower"
+            ],
+            "title": "Event Type"
+          },
+          "peak_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Peak Time"
+          },
+          "related_object_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Object Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "peak_time",
+          "related_object_names"
+        ],
+        "title": "SignificantEvent",
+        "description": "What makes a Significant Event Highlight time-sensitive: what happens, and when."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ViewingWindow": {
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "ViewingWindow"
+      },
+      "VisibleBody": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "category": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Category"
+          },
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "planet",
+              "moon",
+              "constellation",
+              "bright_star",
+              "named_comet",
+              "dso",
+              "significant_event"
+            ],
+            "title": "Object Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "peak_altitude_degrees": {
+            "type": "number",
+            "title": "Peak Altitude Degrees"
+          },
+          "azimuth_at_peak_degrees": {
+            "type": "number",
+            "title": "Azimuth At Peak Degrees"
+          },
+          "rises_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rises At"
+          },
+          "sets_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sets At"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Magnitude"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignificantEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "object_type",
+          "name",
+          "peak_altitude_degrees",
+          "azimuth_at_peak_degrees",
+          "rises_at",
+          "sets_at",
+          "magnitude"
+        ],
+        "title": "VisibleBody",
+        "description": "A catalog body that is Visible on the night, with its positional fields for the Detail Layer.\n\nA Significant Event Highlight has the same shape, with `event` set. Its positional fields say\nwhere and when to look for the event."
+      }
+    }
+  }
+}
