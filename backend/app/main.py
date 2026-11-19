@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import astronomy
 from app.astronomy import compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
 from app.schemas import Highlight, ReportRequest, ReportResponse, SkyObject
@@ -79,17 +80,13 @@ def create_report(
         report_request.timezone,
         report_request.date,
     )
-    highlights = [SkyObject.model_validate(body) for body in sky.highlights]
-    narrator_input = [
-        {**highlight.model_dump(mode="json"), "context": body.context}
-        for highlight, body in zip(highlights, sky.highlights, strict=True)
-    ]
+    highlights = [SkyObject.model_validate(highlight.body) for highlight in sky.highlights]
     try:
-        headline, cards = _narrate(narrator, narrator_input, highlights)
+        headline, cards = _narrate(narrator, sky.highlights, highlights)
     except NarrationError as first_failure:
         logger.warning("Narration failed, retrying once: %s", first_failure)
         sleep(NARRATION_RETRY_DELAY_SECONDS)
-        headline, cards = _narrate(narrator, narrator_input, highlights)
+        headline, cards = _narrate(narrator, sky.highlights, highlights)
     return ReportResponse(
         headline=headline,
         viewing_window=sky.viewing_window,
@@ -99,10 +96,10 @@ def create_report(
 
 
 def _narrate(
-    narrator: Narrator, narrator_input: list[dict], highlights: list[SkyObject]
+    narrator: Narrator, sky_highlights: list[astronomy.Highlight], highlights: list[SkyObject]
 ) -> tuple[str, list[Highlight]]:
     """One narration attempt: the Headline, and the Highlights with their cards attached."""
-    narration = narrator.narrate(narrator_input)
+    narration = narrator.narrate(sky_highlights)
     return narration.headline, _merge_cards(highlights, narration)
 
 

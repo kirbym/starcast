@@ -1,12 +1,16 @@
+import json
 import os
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import anthropic
 import httpx
 import pytest
 
+from app.astronomy import Highlight, SignificantEvent, VisibleBody
 from app.narrator import (
     BANNED_PHRASES,
+    HIGHLIGHT_FIELDS,
     SYSTEM_PROMPT,
     ClaudeNarrator,
     Narration,
@@ -20,8 +24,10 @@ class FakeClient:
     def __init__(self, outcome) -> None:
         self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
         self._outcome = outcome
+        self.request: dict | None = None
 
-    def _create(self, **_kwargs):
+    def _create(self, **kwargs):
+        self.request = kwargs
         if isinstance(self._outcome, Exception):
             raise self._outcome
         return self._outcome
@@ -71,6 +77,60 @@ def test_every_banned_phrase_reaches_the_system_prompt():
         assert f'"{phrase}"' in SYSTEM_PROMPT
 
 
+JUPITER = VisibleBody(
+    id="planet:jupiter",
+    category="planet_moon",
+    object_type="planet",
+    name="Jupiter",
+    peak_altitude_degrees=54.8,
+    azimuth_at_peak_degrees=132.2,
+    rises_at=datetime(2026, 11, 6, 4, 51, 49, tzinfo=UTC),
+    sets_at=datetime(2026, 11, 6, 18, 30, 12, tzinfo=UTC),
+    magnitude=-2.03,
+)
+
+
+def test_sends_each_highlights_raw_fields_and_context_as_json():
+    client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
+    conjunction = VisibleBody(
+        id="significant_event:conjunction_jupiter_saturn",
+        category="featured",
+        object_type="significant_event",
+        name="Jupiter and Saturn in conjunction",
+        peak_altitude_degrees=12.0,
+        azimuth_at_peak_degrees=230.0,
+        rises_at=None,
+        sets_at=None,
+        magnitude=None,
+        event=SignificantEvent(
+            event_type="conjunction",
+            peak_time=datetime(2020, 12, 21, 22, 0, tzinfo=UTC),
+            related_object_names=("Jupiter", "Saturn"),
+        ),
+    )
+
+    ClaudeNarrator(client).narrate(
+        [Highlight(JUPITER), Highlight(conjunction, {"separation_degrees": 0.1})]
+    )
+
+    sent = json.loads(client.request["messages"][0]["content"])
+    assert [tuple(highlight) for highlight in sent] == [HIGHLIGHT_FIELDS, HIGHLIGHT_FIELDS]
+    jupiter, event = sent
+    assert jupiter["rises_at"] == "2026-11-06T04:51:49Z"
+    assert jupiter["context"] is None
+    assert event["event"] == {
+        "event_type": "conjunction",
+        "peak_time": "2020-12-21T22:00:00Z",
+        "related_object_names": ["Jupiter", "Saturn"],
+    }
+    assert event["context"] == {"separation_degrees": 0.1}
+
+
+def test_system_prompt_names_every_raw_field():
+    for field in HIGHLIGHT_FIELDS:
+        assert field in SYSTEM_PROMPT
+
+
 @pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"), reason="calls the real Claude API; needs a key"
 )
@@ -86,20 +146,7 @@ def test_real_claude_narrator_returns_schema_valid_quiet_night():
     not os.environ.get("ANTHROPIC_API_KEY"), reason="calls the real Claude API; needs a key"
 )
 def test_real_claude_narrator_echoes_the_highlight_id_on_its_card():
-    jupiter = {
-        "id": "planet:jupiter",
-        "category": "planet_moon",
-        "object_type": "planet",
-        "name": "Jupiter",
-        "peak_altitude_degrees": 54.8,
-        "azimuth_at_peak_degrees": 132.2,
-        "rises_at": "2026-11-06T04:51:49Z",
-        "sets_at": "2026-11-06T18:30:12Z",
-        "magnitude": -2.03,
-        "event": None,
-    }
-
-    narration = ClaudeNarrator().narrate([jupiter])
+    narration = ClaudeNarrator().narrate([Highlight(JUPITER)])
 
     assert [card.id for card in narration.cards] == ["planet:jupiter"]
     assert narration.cards[0].mini_headline.strip()

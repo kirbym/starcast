@@ -165,13 +165,19 @@ def test_body_that_neither_rises_nor_sets_tonight_has_null_rise_and_set_times():
 
 def highlight_in(sky, category: str):
     """The night's one Highlight in a Category, or None."""
-    picks = [body for body in sky.highlights if body.category == category]
+    picks = [highlight for highlight in sky.highlights if highlight.body.category == category]
     assert len(picks) <= 1
     return picks[0] if picks else None
 
 
+def highlighted_body(sky, category: str):
+    """The Visible body of the night's one Highlight in a Category, or None."""
+    highlight = highlight_in(sky, category)
+    return highlight.body if highlight else None
+
+
 def category_1_highlight(sky):
-    return highlight_in(sky, "planet_moon")
+    return highlighted_body(sky, "planet_moon")
 
 
 def test_gas_giant_outranks_a_higher_rocky_planet():
@@ -276,7 +282,7 @@ def test_visible_constellation_carries_its_positional_fields():
 
 
 def category_2_highlight(sky):
-    return highlight_in(sky, "constellation")
+    return highlighted_body(sky, "constellation")
 
 
 @pytest.mark.parametrize(
@@ -348,7 +354,7 @@ def test_bright_star_that_never_rises_is_absent():
 
 
 def category_3_highlight(sky):
-    return highlight_in(sky, "featured")
+    return highlighted_body(sky, "featured")
 
 
 def test_brightest_visible_star_is_the_category_3_highlight_even_when_lower_than_others():
@@ -375,6 +381,18 @@ def test_category_3_is_the_brightest_visible_standing_body(location, timezone, n
     featured = [body for body in sky.visible_objects if body.category == "featured"]
     brightest = min(featured, key=lambda body: body.magnitude)
     assert category_3_highlight(sky) == brightest
+
+
+def catalog_body(body_id: str):
+    """The In Catalog body with this id."""
+    bodies = CATALOG.planets_and_moon + CATALOG.constellations + CATALOG.featured
+    return next(body for body in bodies if body.id == body_id)
+
+
+def only_category_3(*ids: str) -> Catalog:
+    """A catalog whose Category 3 Highlight can only be one of these bodies: no Planets or Moon to
+    make a Significant Event, and no meteor showers."""
+    return replace(only_featured(*ids), planets_and_moon=(), meteor_showers=())
 
 
 def only_featured(*ids: str) -> Catalog:
@@ -407,7 +425,10 @@ def test_category_3_is_omitted_when_no_candidate_is_visible():
     )
 
     assert bright_stars(sky) == []
-    assert [body.category for body in sky.highlights] == ["planet_moon", "constellation"]
+    assert [highlight.body.category for highlight in sky.highlights] == [
+        "planet_moon",
+        "constellation",
+    ]
 
 
 def dsos(sky) -> list:
@@ -427,19 +448,21 @@ def test_all_110_messier_dsos_are_in_catalog_with_magnitudes():
         assert body.magnitude is not None
     assert seen["dso:m31"].name == "Andromeda Galaxy"
     assert seen["dso:m45"].name == "Pleiades"
-    assert seen["dso:m40"].context["type"] == "double star"
+    assert catalog_body("dso:m40").context["type"] == "double star"
     # A DSO with no common name goes by its Messier number.
     assert seen["dso:m92"].name == "M92"
     # OpenNGC follows Messier's own retraction of M102; StarCast takes the Spindle Galaxy.
     assert seen["dso:m102"].name == "Spindle Galaxy"
-    assert seen["dso:m102"].context["designation"] == "NGC 5866"
+    assert catalog_body("dso:m102").context["designation"] == "NGC 5866"
     # OpenNGC has no magnitude for M22; the override table supplies SEDS's.
     assert seen["dso:m22"].magnitude == pytest.approx(5.1)
 
 
 def test_visible_dso_carries_its_positional_fields_and_catalog_context():
     # Early November from New York, the Andromeda Galaxy passes almost overhead in the evening.
-    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", date(2026, 11, 5), only_category_3("dso:m31")
+    )
 
     andromeda = visible_body(sky, "dso:m31")
     assert andromeda.object_type == "dso"
@@ -447,7 +470,7 @@ def test_visible_dso_carries_its_positional_fields_and_catalog_context():
     assert andromeda.name == "Andromeda Galaxy"
     assert andromeda.peak_altitude_degrees > 80
     assert andromeda.magnitude == pytest.approx(3.44)
-    assert andromeda.context == {
+    assert highlight_in(sky, "featured").context == {
         "messier": "M31",
         "designation": "NGC 224",
         "type": "galaxy",
@@ -480,7 +503,7 @@ def test_bright_dso_outranks_a_fainter_bright_star_in_category_3(ids):
 def test_highlights_from_all_three_categories_appear_together_in_category_order():
     sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 5))
 
-    assert [body.category for body in sky.highlights] == [
+    assert [highlight.body.category for highlight in sky.highlights] == [
         "planet_moon",
         "constellation",
         "featured",
@@ -530,10 +553,19 @@ def test_bright_named_comet_is_visible_with_its_computed_magnitude():
     assert 5 < neowise.peak_altitude_degrees < 25
     assert 270 < neowise.azimuth_at_peak_degrees < 360
     assert neowise.sets_at is not None
-    assert neowise.context["designation"] == "C/2020 F3"
-    assert neowise.context["perihelion_date"] == "2020-07-05"
     # Every other Named Comet is far from the Sun and far too faint.
     assert [body.id for body in comets(sky)] == ["comet:neowise"]
+
+
+def test_named_comet_highlight_carries_its_designation_and_perihelion_date():
+    sky = compute_night_sky(
+        *NEW_YORK, "America/New_York", NEOWISE_NIGHT, only_category_3("comet:neowise")
+    )
+
+    highlight = highlight_in(sky, "featured")
+    assert highlight.body.id == "comet:neowise"
+    assert highlight.context["designation"] == "C/2020 F3"
+    assert highlight.context["perihelion_date"] == "2020-07-05"
 
 
 def neowise_altitude_at_dusk(night: date) -> float:
@@ -583,7 +615,7 @@ def test_missing_comet_elements_omit_the_named_comets_and_the_night_still_comput
     sky = compute_night_sky(*NEW_YORK, "America/New_York", NEOWISE_NIGHT)
 
     assert comets(sky) == []
-    assert [body.category for body in sky.highlights] == [
+    assert [highlight.body.category for highlight in sky.highlights] == [
         "planet_moon",
         "constellation",
         "featured",
@@ -603,9 +635,15 @@ def test_named_comet_whose_elements_cannot_be_used_is_left_out(monkeypatch):
 
 
 def significant_event(sky):
-    """The night's Significant Event Highlight, or None."""
+    """The night's Significant Event Highlight's body, or None."""
     event = category_3_highlight(sky)
     return event if event and event.object_type == "significant_event" else None
+
+
+def significant_event_context(sky):
+    """The narration context of the night's Significant Event Highlight."""
+    assert significant_event(sky) is not None
+    return highlight_in(sky, "featured").context
 
 
 GREAT_CONJUNCTION_NIGHT = date(2020, 12, 21)
@@ -623,7 +661,7 @@ def test_great_conjunction_of_jupiter_and_saturn_is_the_category_3_highlight():
     assert conjunction.name == "Jupiter and Saturn in conjunction"
     assert conjunction.event.event_type == "conjunction"
     assert conjunction.event.related_object_names == ("Jupiter", "Saturn")
-    assert conjunction.context["separation_degrees"] == pytest.approx(0.10, abs=0.01)
+    assert significant_event_context(sky)["separation_degrees"] == pytest.approx(0.10, abs=0.01)
     # Closest approach was at 18:20 UTC, before dusk here; from dusk on they only draw apart, so
     # the closest Visible moment is as the Viewing Window opens, before the pair sets.
     jupiter, saturn = (visible_body(sky, f"planet:{name}") for name in ("jupiter", "saturn"))
@@ -678,7 +716,7 @@ def test_tightest_of_two_conjunctions_is_the_category_3_highlight():
     conjunction = significant_event(sky)
     assert conjunction.id == "significant_event:conjunction_moon_regulus"
     assert conjunction.event.related_object_names == ("Moon", "Regulus")
-    assert conjunction.context["separation_degrees"] < 0.5
+    assert significant_event_context(sky)["separation_degrees"] < 0.5
 
 
 def test_dso_near_a_planet_never_makes_a_conjunction():
@@ -729,7 +767,7 @@ def test_superior_planet_within_a_night_of_opposition_is_the_category_3_highligh
     window = sky.viewing_window
     assert window.starts_at <= opposition.event.peak_time <= window.ends_at
     # The exact moment of opposition is for the Narrator.
-    opposition_time = datetime.fromisoformat(opposition.context["opposition_time"])
+    opposition_time = datetime.fromisoformat(significant_event_context(sky)["opposition_time"])
     assert abs(opposition_time - utc(2020, 10, 13, 23, 26)) <= timedelta(minutes=1)
     # The event is a Highlight, not a body: Mars is listed as Visible instead.
     assert "significant_event" not in {body.object_type for body in sky.visible_objects}
@@ -843,9 +881,9 @@ def test_perseids_on_their_peak_night_are_the_category_3_highlight():
     assert window.ends_at - shower.event.peak_time <= timedelta(minutes=5)
     assert 40 < shower.peak_altitude_degrees < 90
     assert 0 < shower.azimuth_at_peak_degrees < 90
-    assert shower.context["zhr"] == 100
-    assert shower.context["peak_date"] == "2026-08-12"
-    assert shower.context["parent_body"] == "109P/Swift-Tuttle"
+    assert significant_event_context(sky)["zhr"] == 100
+    assert significant_event_context(sky)["peak_date"] == "2026-08-12"
+    assert significant_event_context(sky)["parent_body"] == "109P/Swift-Tuttle"
     # The event is a Highlight, not a body.
     assert "significant_event" not in {body.object_type for body in sky.visible_objects}
 
@@ -943,7 +981,7 @@ def test_quadrantids_peak_is_found_across_the_year_boundary(night, flagged, peak
         assert shower is None
         return
     assert shower.id == "significant_event:meteor_shower_qua"
-    assert shower.context["peak_date"] == peak_date
+    assert significant_event_context(sky)["peak_date"] == peak_date
 
 
 def test_highest_zhr_wins_among_several_qualifying_showers():

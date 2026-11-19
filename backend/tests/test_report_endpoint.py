@@ -50,9 +50,9 @@ class FakeNarrator:
         if cards is None:
             cards = [
                 NarrationCard(
-                    id=highlight["id"],
-                    mini_headline=f"{highlight['name']} takes the stage",
-                    paragraph=f"A story about {highlight['name']}.",
+                    id=highlight.body.id,
+                    mini_headline=f"{highlight.body.name} takes the stage",
+                    paragraph=f"A story about {highlight.body.name}.",
                 )
                 for highlight in self.received
             ]
@@ -243,17 +243,16 @@ def test_highlight_cards_are_merged_by_id_whatever_order_the_narrator_returns_th
     ]
 
 
-def test_narrator_receives_raw_fields_of_each_highlight(client: TestClient, narrator: FakeNarrator):
+def test_narrator_receives_each_highlight_in_category_order(
+    client: TestClient, narrator: FakeNarrator
+):
     client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
-    assert [received["id"] for received in narrator.received] == [
+    assert [received.body.id for received in narrator.received] == [
         "planet:jupiter",
         "constellation:and",
         "bright_star:sirius",
     ]
-    for received in narrator.received:
-        assert set(received) == POSITIONAL_FIELDS | {"context"}
-        assert isinstance(received["rises_at"], str)
 
 
 def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
@@ -262,9 +261,9 @@ def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
     client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
 
     planet, constellation, star = narrator.received
-    assert planet["context"] is None
-    assert constellation["context"] is None
-    context = star["context"]
+    assert planet.context is None
+    assert constellation.context is None
+    context = star.context
     assert context["bayer_designation"] == "α CMa"
     assert context["constellation"] == "Canis Major"
     assert context["spectral_type"].startswith("A0")
@@ -342,11 +341,10 @@ def test_narrator_receives_the_conjunction_event_and_its_separation(
     client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:conjunction_jupiter_saturn"
-    assert received["event"]["event_type"] == "conjunction"
-    assert received["event"]["related_object_names"] == ["Jupiter", "Saturn"]
-    assert isinstance(received["event"]["peak_time"], str)
-    assert received["context"]["separation_degrees"] == pytest.approx(0.10, abs=0.01)
+    assert received.body.id == "significant_event:conjunction_jupiter_saturn"
+    assert received.body.event.event_type == "conjunction"
+    assert received.body.event.related_object_names == ("Jupiter", "Saturn")
+    assert received.context["separation_degrees"] == pytest.approx(0.10, abs=0.01)
 
 
 def test_conjunction_is_a_highlight_but_not_a_visible_object(client: TestClient):
@@ -383,9 +381,9 @@ def test_narrator_receives_the_opposition_event_and_its_exact_moment(
     client.post("/api/report", json=MARS_OPPOSITION_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:opposition_mars"
-    assert received["event"]["event_type"] == "opposition"
-    assert received["context"]["opposition_time"].startswith("2020-10-13T23:2")
+    assert received.body.id == "significant_event:opposition_mars"
+    assert received.body.event.event_type == "opposition"
+    assert received.context["opposition_time"].startswith("2020-10-13T23:2")
 
 
 # New York on 2026-08-12: the Perseids peak.
@@ -415,11 +413,11 @@ def test_narrator_receives_the_meteor_shower_and_its_catalog_facts(
     client.post("/api/report", json=PERSEIDS_REQUEST)
 
     received = narrator.received[-1]
-    assert received["id"] == "significant_event:meteor_shower_per"
-    assert received["event"]["event_type"] == "meteor_shower"
-    assert received["context"]["zhr"] == 100
-    assert received["context"]["peak_date"] == "2026-08-12"
-    assert received["context"]["parent_body"] == "109P/Swift-Tuttle"
+    assert received.body.id == "significant_event:meteor_shower_per"
+    assert received.body.event.event_type == "meteor_shower"
+    assert received.context["zhr"] == 100
+    assert received.context["peak_date"] == "2026-08-12"
+    assert received.context["parent_body"] == "109P/Swift-Tuttle"
 
 
 @pytest.mark.parametrize(
