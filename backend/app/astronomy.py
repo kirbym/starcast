@@ -4,19 +4,17 @@ import csv
 import logging
 import math
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
 import numpy as np
 from skyfield import almanac
 from skyfield.api import Loader, Star, load, wgs84
-from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
-from skyfield.data import mpc
 from skyfield.jpllib import SpiceKernel
 from skyfield.magnitudelib import planetary_magnitude
 from skyfield.positionlib import Apparent
@@ -24,7 +22,7 @@ from skyfield.timelib import Time
 from skyfield.toposlib import GeographicPosition
 from skyfield.vectorlib import VectorFunction
 
-from app.comets import NAMED_COMETS, CometElements, NamedComet, named_comet_elements
+from app.comets import NAMED_COMETS, CometElements, CometOrbit, NamedComet, named_comet_elements
 
 _log = logging.getLogger(__name__)
 
@@ -33,8 +31,6 @@ DARK = 0  # The code almanac.dark_twilight_day() uses for "Sun below -18 degrees
 _MINUTES_IN_SEARCH = 24 * 60 + 1
 # Every body's Peak Altitude comes from the same sample times, spaced this far apart.
 _SAMPLE_SPACING = timedelta(minutes=5)
-# A Named Comet fainter than this, the naked-eye limit, is not Visible however high it climbs.
-COMET_MAGNITUDE_LIMIT = 6.0
 # Two bodies at most this far apart, both above the horizon at that moment, are in conjunction.
 CONJUNCTION_LIMIT_DEGREES = 2.0
 
@@ -91,11 +87,6 @@ class CatalogBody:
     @property
     def category(self) -> Category:
         return _CATEGORIES[self.object_type]
-
-    @property
-    def is_fixed(self) -> bool:
-        """Whether the body sits at a fixed J2000 point rather than moving through the ephemeris."""
-        return isinstance(self.target, Star)
 
 
 @dataclass(frozen=True)
@@ -417,16 +408,19 @@ def compute_night_sky(
     if window.starts_at == window.ends_at:
         return NightSky(viewing_window=window)
 
-    observer = _ephemeris()["earth"] + wgs84.latlon(latitude, longitude)
-    samples = _sample_times(window)
-    planets_and_moon = _observe_visible(catalog.planets_and_moon, observer, samples)
-    constellations = _observe_visible(catalog.constellations, observer, samples)
-    category_3_bodies = _observe_visible(
-        catalog.category_3, observer, samples, _comet_elements(catalog)
+    night = _Night(
+        observer=_ephemeris()["earth"] + wgs84.latlon(latitude, longitude),
+        latitude=latitude,
+        local_noon=local_noon,
+        samples=_sample_times(window),
+        # Loaded only if a Named Comet is placed, and then only once for the night.
+        comet_elements=cache(lambda: named_comet_elements(data_dir())),
     )
+    planets_and_moon = _observe_visible(catalog.planets_and_moon, night)
+    constellations = _observe_visible(catalog.constellations, night)
+    category_3_bodies = _observe_visible(catalog.category_3, night)
     category_1 = max(planets_and_moon, key=_category_1_priority, default=None)
     category_2 = max(constellations, key=_category_2_priority, default=None)
-    night = _Night(observer, latitude, local_noon, samples)
     category_3 = _category_3_highlight(
         planets_and_moon + category_3_bodies, night, catalog.meteor_showers
     )
@@ -450,6 +444,8 @@ class _Night:
     latitude: float
     local_noon: datetime
     samples: Time
+    # The Named Comets' orbital elements, by designation.
+    comet_elements: Callable[[], Mapping[str, CometElements]]
 
 
 @dataclass(frozen=True)
@@ -474,46 +470,119 @@ class _Observation:
         return Highlight(self.body, self.context)
 
 
-def _observe_visible(
-    bodies: tuple[CatalogBody, ...],
-    observer,
-    samples: Time,
-    comet_elements: Mapping[str, CometElements] | None = None,
-) -> list[_Observation]:
-    """Every one of the bodies that is Visible across the sample times.
+def _observe_visible(bodies: tuple[CatalogBody, ...], night: _Night) -> list[_Observation]:
+    """Every one of the bodies that is Visible across the night's sample times.
 
-    A Named Comet without orbital elements cannot be placed, so it is left out.
+    A body that cannot be placed, like a Named Comet without usable orbital elements, is left out.
     """
     observed = []
     for body in bodies:
-        if isinstance(body.target, NamedComet):
-            seen = _observe_named_comet(body, comet_elements or {}, observer, samples)
-        else:
-            seen = _observe(body, observer, samples)
+        placement = _place(body, night)
+        seen = placement and _observe(body, placement, night)
         if seen:
             observed.append(seen)
     return observed
 
 
-def _observe_named_comet(
-    body: CatalogBody, comet_elements: Mapping[str, CometElements], observer, samples: Time
-) -> _Observation | None:
-    """Place one Named Comet, leaving it out if its elements are missing or unusable."""
-    elements = comet_elements.get(body.target.designation)
+class _Placement(Protocol):
+    """How one kind of catalog body is placed for the night: what to observe, how bright it is at a
+    moment, whether that brightness counts as Visible, and what the Narrator is told about it.
+
+    The adapters are a fixed point (a Named Constellation's Centroid, a Bright Star, a DSO), a
+    Planet, the Moon, and a Named Comet's orbit (comets.CometOrbit).
+    """
+
+    @property
+    def target(self): ...
+
+    def magnitude(self, observer: VectorFunction, moment: Time) -> float | None: ...
+
+    def is_visible(self, magnitude: float | None) -> bool: ...
+
+    def context(self) -> NarrationContext: ...
+
+
+@dataclass(frozen=True)
+class _FixedPoint:
+    """A body at a fixed J2000 point, with its magnitude, if any, from the catalog."""
+
+    target: Star
+    catalog_magnitude: float | None
+
+    def magnitude(self, _observer: VectorFunction, _moment: Time) -> float | None:
+        return self.catalog_magnitude
+
+    def is_visible(self, _magnitude: float | None) -> bool:
+        return True
+
+    def context(self) -> NarrationContext:
+        return {}
+
+
+@dataclass(frozen=True)
+class _Planet:
+    """A Planet, placed by the ephemeris, its magnitude computed for the moment."""
+
+    target: VectorFunction
+
+    def magnitude(self, observer: VectorFunction, moment: Time) -> float | None:
+        magnitude = float(planetary_magnitude(observer.at(moment).observe(self.target)))
+        # Skyfield has no formula for Saturn at large phase angles, and returns NaN there.
+        return None if math.isnan(magnitude) else magnitude
+
+    def is_visible(self, _magnitude: float | None) -> bool:
+        return True
+
+    def context(self) -> NarrationContext:
+        return {}
+
+
+@dataclass(frozen=True)
+class _Moon:
+    """The Moon, placed by the ephemeris, its magnitude from its phase."""
+
+    target: VectorFunction
+    sun: VectorFunction
+
+    def magnitude(self, observer: VectorFunction, moment: Time) -> float:
+        """Allen's formula for the Moon's apparent magnitude at a given phase angle."""
+        position = observer.at(moment).observe(self.target).apparent()
+        phase_angle = position.phase_angle(self.sun).degrees
+        return float(-12.73 + 0.026 * abs(phase_angle) + 4e-9 * phase_angle**4)
+
+    def is_visible(self, _magnitude: float | None) -> bool:
+        return True
+
+    def context(self) -> NarrationContext:
+        return {}
+
+
+def _place(body: CatalogBody, night: _Night) -> _Placement | None:
+    """The body's placement for the night, or None if it cannot be placed.
+
+    This is the one place a catalog body's kind decides how it is observed.
+    """
+    match body.target:
+        case Star():
+            return _FixedPoint(body.target, body.magnitude)
+        case NamedComet():
+            return _place_named_comet(body, body.target, night)
+        case str() if body.object_type == "moon":
+            return _Moon(_ephemeris()[body.target], _ephemeris()["sun"])
+        case str():
+            return _Planet(_ephemeris()[body.target])
+
+
+def _place_named_comet(body: CatalogBody, comet: NamedComet, night: _Night) -> CometOrbit | None:
+    """A Named Comet's orbit, or None if its elements are missing or unusable."""
+    elements = night.comet_elements().get(comet.designation)
     if elements is None:
         return None
     try:
-        return _observe_comet(body, elements, observer, samples)
+        return CometOrbit.place(elements, _ephemeris()["sun"], _timescale)
     except Exception:
         _log.warning("Could not place %s from its orbital elements", body.id, exc_info=True)
         return None
-
-
-def _comet_elements(catalog: Catalog) -> Mapping[str, CometElements]:
-    """The Named Comets' orbital elements, if the catalog has any Named Comets to place."""
-    if not any(isinstance(body.target, NamedComet) for body in catalog.category_3):
-        return {}
-    return named_comet_elements(data_dir())
 
 
 def _category_3_highlight(
@@ -709,10 +778,10 @@ def _meteor_shower_highlight(shower: MeteorShower, night: _Night) -> Highlight |
     Meteors stream from the radiant, and the higher it stands the more of them are seen, so the
     shower is at its best at the radiant's Peak Altitude.
     """
-    track = _track(night.observer, shower.radiant, night.samples)
-    peak = _peak(track, night.samples)
-    if peak is None:
+    located = _locate(night.observer, shower.radiant, night.samples)
+    if located is None:
         return None
+    _, peak = located
     context: dict[str, str | float] = {
         "zhr": shower.zhr,
         "peak_date": _nearest_peak(shower, night.local_noon.date()).isoformat(),
@@ -779,39 +848,28 @@ def _sample_times(window: ViewingWindow) -> Time:
     )
 
 
-def _observe(body: CatalogBody, observer, samples: Time) -> _Observation | None:
-    """Position one body over the night, or None if it never clears the horizon."""
-    target = body.target if body.is_fixed else _ephemeris()[body.target]
-    track = _track(observer, target, samples)
-    peak = _peak(track, samples)
-    if peak is None:
-        return None
-    magnitude = _magnitude(body, observer, target, peak.time)
-    visible = _visible_body(body, observer, target, peak, magnitude)
-    return _Observation(body, visible, peak.time, track, body.context)
+def _observe(body: CatalogBody, placement: _Placement, night: _Night) -> _Observation | None:
+    """Position one body over the night, or None if it is not Visible.
 
-
-def _observe_comet(
-    body: CatalogBody, elements: CometElements, observer, samples: Time
-) -> _Observation | None:
-    """Place a Named Comet from its orbital elements, or None if it is not Visible that night.
-
-    A Named Comet counts only when it is no fainter than the naked-eye limit at its Peak Altitude.
+    It must clear the horizon, and its placement must count its magnitude at its peak as Visible.
     """
-    # MPC comet orbits are centred on the Sun, not on the Solar System's barycenter.
-    orbit = mpc.comet_orbit(elements.to_skyfield_row(), _timescale, GM_SUN)
-    target = _ephemeris()["sun"] + orbit
+    located = _locate(night.observer, placement.target, night.samples)
+    if located is None:
+        return None
+    track, peak = located
+    magnitude = placement.magnitude(night.observer, peak.time)
+    if not placement.is_visible(magnitude):
+        return None
+    visible = _visible_body(body, night.observer, placement.target, peak, magnitude)
+    context = {**(body.context or {}), **placement.context()} or None
+    return _Observation(body, visible, peak.time, track, context)
+
+
+def _locate(observer, target, samples: Time) -> "tuple[_Track, _Peak] | None":
+    """Where the target stands through the night, and at its highest, or None if it never rises."""
     track = _track(observer, target, samples)
     peak = _peak(track, samples)
-    if peak is None:
-        return None
-    magnitude = _comet_magnitude(elements, orbit, observer, target, peak.time)
-    # A NaN magnitude, from elements without magnitude parameters, fails this test too.
-    if not magnitude <= COMET_MAGNITUDE_LIMIT:
-        return None
-    visible = _visible_body(body, observer, target, peak, magnitude)
-    context = {**(body.context or {}), "perihelion_date": _perihelion_date(elements)}
-    return _Observation(body, visible, peak.time, track, context)
+    return None if peak is None else (track, peak)
 
 
 @dataclass(frozen=True)
@@ -874,50 +932,6 @@ def _setting_after(observer, target, peak_time: Time) -> datetime | None:
     times, set_ = almanac.find_settings(observer, target, peak_time, peak_time + 1)
     settings = [moment for moment, ok in zip(times, set_, strict=True) if ok]
     return _to_utc(settings[0]) if settings else None
-
-
-def _magnitude(body: CatalogBody, observer, target, moment: Time) -> float | None:
-    """The body's apparent magnitude, or None where it has none, as for a Named Constellation.
-
-    A fixed body's magnitude comes from the catalog; a moving body's is computed for the moment.
-    """
-    if body.is_fixed:
-        return body.magnitude
-    if body.object_type == "moon":
-        return _moon_magnitude(observer, target, moment)
-    magnitude = float(planetary_magnitude(observer.at(moment).observe(target)))
-    # Skyfield has no formula for Saturn at large phase angles, and returns NaN there.
-    return None if math.isnan(magnitude) else magnitude
-
-
-def _comet_magnitude(
-    elements: CometElements, orbit: VectorFunction, observer, comet, moment: Time
-) -> float:
-    """The MPC's total-magnitude law for a comet: m = H + 5 log10(delta) + 2.5 K log10(r).
-
-    delta is the comet's distance from the observer and r its distance from the Sun, in AU. The
-    result is NaN if the elements carry no magnitude parameters.
-    """
-    delta = observer.at(moment).observe(comet).distance().au
-    r = orbit.at(moment).distance().au
-    return float(
-        elements.magnitude_g + 5 * math.log10(delta) + 2.5 * elements.magnitude_k * math.log10(r)
-    )
-
-
-def _perihelion_date(elements: CometElements) -> str:
-    """The date of the perihelion passage the elements describe, as YYYY-MM-DD."""
-    perihelion = _timescale.tt(
-        elements.perihelion_year, elements.perihelion_month, elements.perihelion_day
-    )
-    return perihelion.utc_datetime().date().isoformat()
-
-
-def _moon_magnitude(observer, moon, moment: Time) -> float:
-    """Allen's formula for the Moon's apparent magnitude at a given phase angle."""
-    sun = _ephemeris()["sun"]
-    phase_angle = observer.at(moment).observe(moon).apparent().phase_angle(sun).degrees
-    return float(-12.73 + 0.026 * abs(phase_angle) + 4e-9 * phase_angle**4)
 
 
 def _viewing_window(latitude: float, longitude: float, local_noon: datetime) -> ViewingWindow:

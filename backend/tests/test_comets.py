@@ -7,17 +7,20 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from skyfield.api import load
+from skyfield.api import Loader, load, wgs84
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 
+from app.astronomy import EPHEMERIS_FILE, data_dir
 from app.comets import (
     _MAGNITUDE_COLUMNS,
     _NUMERIC_COLUMNS,
     _ORBIT_COLUMNS,
+    COMET_MAGNITUDE_LIMIT,
     NAMED_COMETS,
     PINNED_ELEMENTS_ENV,
     CometElements,
+    CometOrbit,
     MpcElementsCache,
     _designation,
     named_comet_elements,
@@ -276,3 +279,54 @@ def test_our_designation_of_each_row_is_skyfields(fixture: Path):
     compared = [(o, s) for o, s in zip(ours, skyfields, strict=True) if isinstance(s, str)]
     assert [o for o, _ in compared] == [s for _, s in compared]
     assert NAMED_DESIGNATIONS & {o for o, _ in compared}
+
+
+@pytest.fixture(scope="module")
+def ephemeris():
+    directory = data_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    return Loader(str(directory), verbose=False)(EPHEMERIS_FILE)
+
+
+@pytest.fixture
+def neowise_orbit(tmp_path: Path, ephemeris) -> CometOrbit:
+    neowise = named_comet_elements(tmp_path)["C/2020 F3 (NEOWISE)"]
+    return CometOrbit.place(neowise, ephemeris["sun"], load.timescale(builtin=True))
+
+
+def test_a_placed_comet_carries_its_perihelion_date_for_the_narrator(neowise_orbit: CometOrbit):
+    assert neowise_orbit.context() == {"perihelion_date": "2020-07-05"}
+
+
+def test_a_bright_comets_magnitude_counts_as_visible(neowise_orbit: CometOrbit, ephemeris):
+    # 2020-07-20 from New York: observers put NEOWISE near magnitude 3.
+    observer = ephemeris["earth"] + wgs84.latlon(40.7167, -74.0)
+    moment = load.timescale(builtin=True).utc(2020, 7, 21, 2)
+
+    magnitude = neowise_orbit.magnitude(observer, moment)
+
+    assert 2.0 < magnitude < 4.5
+    assert neowise_orbit.is_visible(magnitude)
+
+
+@pytest.mark.parametrize(
+    ("magnitude", "visible"),
+    [(COMET_MAGNITUDE_LIMIT, True), (COMET_MAGNITUDE_LIMIT + 0.01, False), (math.nan, False)],
+)
+def test_only_a_comet_at_or_above_the_naked_eye_limit_is_visible(
+    neowise_orbit: CometOrbit, magnitude: float, visible: bool
+):
+    assert neowise_orbit.is_visible(magnitude) is visible
+
+
+def test_a_comet_without_magnitude_parameters_is_never_visible(
+    ephemeris, neowise_orbit: CometOrbit
+):
+    faceless = dataclasses.replace(neowise_orbit.elements, magnitude_g=math.nan)
+    orbit = CometOrbit.place(faceless, ephemeris["sun"], load.timescale(builtin=True))
+    observer = ephemeris["earth"] + wgs84.latlon(40.7167, -74.0)
+
+    magnitude = orbit.magnitude(observer, load.timescale(builtin=True).utc(2020, 7, 21, 2))
+
+    assert math.isnan(magnitude)
+    assert not orbit.is_visible(magnitude)

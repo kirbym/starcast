@@ -8,6 +8,7 @@ docs/research/comet-catalog.md.
 
 import io
 import logging
+import math
 import os
 import urllib.request
 from collections.abc import Callable
@@ -15,9 +16,13 @@ from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Self
 
 import pandas as pd
+from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
+from skyfield.timelib import Time, Timescale
+from skyfield.vectorlib import VectorFunction
 
 ELEMENTS_URL = "https://www.minorplanetcenter.net/iau/MPCORB/AllCometEls.txt"
 ELEMENTS_FILE = "AllCometEls.txt"
@@ -68,6 +73,62 @@ class CometElements:
     def to_skyfield_row(self) -> pd.Series:
         """The elements as the row skyfield.data.mpc.comet_orbit takes."""
         return pd.Series(asdict(self))
+
+
+# A Named Comet fainter than this, the naked-eye limit, is not Visible however high it climbs.
+COMET_MAGNITUDE_LIMIT = 6.0
+
+
+@dataclass(frozen=True)
+class CometOrbit:
+    """Where a Named Comet is, and how bright, from its MPC orbital elements.
+
+    This is the Named Comet's placement for the astronomy engine: what to observe, its magnitude
+    at a moment, whether that magnitude is bright enough to count as Visible, and what the
+    Narrator is told about it.
+    """
+
+    elements: CometElements
+    # Centred on the Sun, as MPC comet orbits are.
+    orbit: VectorFunction
+    # The comet itself, placed in the Solar System.
+    target: VectorFunction
+    perihelion_date: str
+
+    @classmethod
+    def place(cls, elements: CometElements, sun: VectorFunction, timescale: Timescale) -> Self:
+        """The comet's orbit, raising if the elements cannot place it.
+
+        The orbit is propagated once here, at perihelion, so that unusable elements fail now
+        rather than partway through observing the night.
+        """
+        orbit = mpc.comet_orbit(elements.to_skyfield_row(), timescale, GM_SUN)
+        perihelion = timescale.tt(
+            elements.perihelion_year, elements.perihelion_month, elements.perihelion_day
+        )
+        orbit.at(perihelion)
+        return cls(elements, orbit, sun + orbit, perihelion.utc_datetime().date().isoformat())
+
+    def magnitude(self, observer: VectorFunction, moment: Time) -> float:
+        """The MPC's total-magnitude law: m = H + 5 log10(delta) + 2.5 K log10(r).
+
+        delta is the comet's distance from the observer and r its distance from the Sun, in AU.
+        The result is NaN if the elements carry no magnitude parameters.
+        """
+        delta = observer.at(moment).observe(self.target).distance().au
+        r = self.orbit.at(moment).distance().au
+        return float(
+            self.elements.magnitude_g
+            + 5 * math.log10(delta)
+            + 2.5 * self.elements.magnitude_k * math.log10(r)
+        )
+
+    def is_visible(self, magnitude: float | None) -> bool:
+        """Only a comet no fainter than the naked-eye limit counts; a NaN magnitude never does."""
+        return magnitude is not None and magnitude <= COMET_MAGNITUDE_LIMIT
+
+    def context(self) -> dict[str, str | float]:
+        return {"perihelion_date": self.perihelion_date}
 
 
 # Comet West and Ikeya-Seki broke apart near the Sun; each is followed by its main fragment, A.
