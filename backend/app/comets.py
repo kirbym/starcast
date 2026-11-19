@@ -11,7 +11,7 @@ import logging
 import os
 import urllib.request
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -49,8 +49,8 @@ class NamedComet:
 class CometElements:
     """A comet's MPC orbital elements, with the types the astronomy engine relies on.
 
-    The magnitude parameters are NaN where the MPC leaves them blank, so a comet of unknown
-    brightness is never Visible. Each field is named as Skyfield's MPC parser names its column.
+    The magnitude parameters are NaN where the MPC leaves them blank. Each field is named as
+    Skyfield's MPC parser names its column, and tests/test_comets.py checks it against ours.
     """
 
     designation: str
@@ -101,8 +101,6 @@ _ORBIT_COLUMNS = (
 # Blank in some rows, so read as NaN. A comet of unknown brightness is never Visible.
 _MAGNITUDE_COLUMNS = ("magnitude_g", "magnitude_k")
 _NUMERIC_COLUMNS = _ORBIT_COLUMNS + _MAGNITUDE_COLUMNS
-# All but the perihelion year and month, which are integers.
-_FLOAT_COLUMNS = _NUMERIC_COLUMNS[2:]
 # Where a row of the MPC comet format keeps the designation and name, read from Skyfield's own
 # layout of the format so the two cannot drift apart. Skyfield keeps that layout private, so if
 # it is renamed, importing this module fails rather than every Named Comet quietly going missing.
@@ -238,20 +236,18 @@ def _select_named_rows(content: bytes) -> pd.DataFrame | None:
 
 
 def _coerce_elements(rows: pd.DataFrame) -> list[CometElements]:
-    """The Named Comets' parsed rows, made usable for placing them.
+    """The Named Comets' typed elements, from their parsed rows.
 
     Numeric columns become numbers, so a blank magnitude parameter becomes NaN; a row whose orbit
-    cannot be read is dropped; and the perihelion year and month become integers.
+    cannot be read is dropped; and each field takes its declared type, so the perihelion year and
+    month become integers.
     """
     for column in _NUMERIC_COLUMNS:
         rows[column] = pd.to_numeric(rows[column], errors="coerce")
     rows = rows.dropna(subset=list(_ORBIT_COLUMNS))
     return [
         CometElements(
-            designation=row["designation"],
-            perihelion_year=int(row["perihelion_year"]),
-            perihelion_month=int(row["perihelion_month"]),
-            **{column: float(row[column]) for column in _FLOAT_COLUMNS},
+            **{field.name: field.type(row[field.name]) for field in fields(CometElements)}
         )
         for _, row in rows.iterrows()
     ]

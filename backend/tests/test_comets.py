@@ -192,8 +192,9 @@ def test_irregular_rows_in_the_elements_still_yield_typed_named_comets(
     assert neowise.perihelion_day == pytest.approx(5.1107)
     assert neowise.magnitude_g == pytest.approx(7.5)
     assert neowise.magnitude_k == pytest.approx(5.2)
-    for field in (*_ORBIT_COLUMNS[2:], *_MAGNITUDE_COLUMNS):
-        assert type(getattr(neowise, field)) is float, field
+    for field in (*_ORBIT_COLUMNS, *_MAGNITUDE_COLUMNS):
+        if field not in ("perihelion_year", "perihelion_month"):
+            assert type(getattr(neowise, field)) is float, field
 
 
 def test_named_comet_with_blank_magnitudes_has_nan_magnitudes(
@@ -236,15 +237,21 @@ def test_skyfield_places_a_comet_from_our_orbit_columns_alone(elements: bytes):
 
 
 def test_skyfield_places_a_comet_from_its_typed_elements(elements: bytes, tmp_path: Path):
-    typed = named_comet_elements(tmp_path)["C/2020 F3 (NEOWISE)"]
+    neowise = named_comet_elements(tmp_path)["C/2020 F3 (NEOWISE)"]
     rows = skyfield_rows(elements).set_index("designation", drop=False)
     timescale = load.timescale(builtin=True)
     moment = timescale.utc(2020, 7, 20)
 
-    ours = mpc.comet_orbit(typed.to_skyfield_row(), timescale, GM_SUN)
-    skyfields = mpc.comet_orbit(rows.loc["C/2020 F3 (NEOWISE)"], timescale, GM_SUN)
+    ours = mpc.comet_orbit(neowise.to_skyfield_row(), timescale, GM_SUN)
+    theirs = mpc.comet_orbit(rows.loc["C/2020 F3 (NEOWISE)"], timescale, GM_SUN)
 
-    assert ours.at(moment).position.au == pytest.approx(skyfields.at(moment).position.au)
+    assert ours.at(moment).position.au == pytest.approx(theirs.at(moment).position.au)
+
+
+def test_comet_elements_fields_are_the_columns_we_read():
+    names = [field.name for field in dataclasses.fields(CometElements)]
+
+    assert sorted(names) == sorted(["designation", *_NUMERIC_COLUMNS])
 
 
 @pytest.mark.parametrize("column", _ORBIT_COLUMNS)
