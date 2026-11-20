@@ -4,22 +4,14 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 from typing import Annotated
-from zoneinfo import available_timezones
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from app.sky import ViewingWindow, VisibleBody
 
 # Whole years inside DE440s's coverage (December 1849 to January 2150).
 _EARLIEST_YEAR = 1850
 _LATEST_YEAR = 2149
-_TIMEZONES = available_timezones()
-
-
-def _known_timezone(value: str) -> str:
-    if value not in _TIMEZONES:
-        raise ValueError("unknown IANA timezone")
-    return value
 
 
 def _local_date(value: object) -> dt.date:
@@ -32,10 +24,12 @@ def _local_date(value: object) -> dt.date:
 
 
 class ReportRequest(BaseModel):
+    """A place to report on. Its timezone is looked up from where it is, never sent."""
+
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    timezone: Annotated[str, AfterValidator(_known_timezone)]
-    date: Annotated[dt.date, BeforeValidator(_local_date)]
+    # The place's local date the night begins on; left out, it is today at the place.
+    date: Annotated[dt.date | None, BeforeValidator(_local_date)] = None
     location_label: str | None = None
 
 
@@ -49,6 +43,10 @@ class HighlightCard(VisibleBody):
 
 
 class ReportResponse(BaseModel):
+    # The place's IANA timezone and local date the night was computed for. Every moment in the
+    # report is in UTC; this is the zone to show them in.
+    timezone: str
+    date: dt.date
     headline: str
     viewing_window: ViewingWindow
     highlights: list[HighlightCard]

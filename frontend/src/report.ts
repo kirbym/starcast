@@ -19,14 +19,8 @@ export type ViewingWindow = Schemas['ViewingWindow']
 
 export type CosmicReport = Schemas['ReportResponse']
 
-function localDate(now: Date): string {
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-/** Request tonight's Cosmic Report for a location, on the local date. */
+/** Request tonight's Cosmic Report for a location. The backend finds the place's timezone and
+ * its local date; the report's `timezone` says which zone its times belong to. */
 export async function fetchReport(location: Location): Promise<CosmicReport> {
   const response = await fetch(`${API_BASE_URL}/api/report`, {
     method: 'POST',
@@ -34,8 +28,6 @@ export async function fetchReport(location: Location): Promise<CosmicReport> {
     body: JSON.stringify({
       latitude: location.latitude,
       longitude: location.longitude,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      date: localDate(new Date()),
       location_label: location.label,
     }),
   })

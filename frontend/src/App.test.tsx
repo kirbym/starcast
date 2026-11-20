@@ -15,6 +15,9 @@ import type { VisibleBody } from './report.ts'
 
 const REPORT_URL = 'http://api.test/api/report'
 const QUIET_NIGHT = {
+  // The place's own zone and date; here, the same zone the tests run in.
+  timezone: 'America/Los_Angeles',
+  date: '2026-11-03',
   headline: 'A hush settles over the Pacific sky tonight.',
   viewing_window: {
     starts_at: '2026-11-04T02:30:00Z',
@@ -107,9 +110,7 @@ function renderApp() {
   )
 }
 
-test('shows the Headline for the browser location on the local date', async () => {
-  // 20:30 on 3 November in Los Angeles, when it is already 4 November in UTC.
-  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-04T04:30:00Z') })
+test('shows the Headline for the browser location, leaving its timezone and date to the backend', async () => {
   fakeGeolocation((success) =>
     success({
       coords: { latitude: 34.05, longitude: -118.24 },
@@ -130,14 +131,10 @@ test('shows the Headline for the browser location on the local date', async () =
       name: 'A hush settles over the Pacific sky tonight.',
     }),
   ).toBeInTheDocument()
+  // The place's timezone and tonight's date there are the backend's to work out: the browser's
+  // own would be wrong for a place in another zone.
   expect(requests).toEqual([
-    {
-      latitude: 34.05,
-      longitude: -118.24,
-      timezone: 'America/Los_Angeles',
-      date: '2026-11-03',
-      location_label: 'Los Angeles',
-    },
+    { latitude: 34.05, longitude: -118.24, location_label: 'Los Angeles' },
   ])
 })
 
@@ -285,13 +282,13 @@ test('asks for another place when the location is rejected', async () => {
   )
 })
 
-test('keeps the saved location when the browser-made parts of the request are rejected', async () => {
-  // The browser supplies the timezone and date; one the backend can't use says nothing about the place.
+test('keeps the saved location when the rest of the request is rejected', async () => {
+  // Only the latitude and longitude are the place; a bad label says nothing about it.
   vi.spyOn(console, 'error').mockImplementation(() => {})
   saveLocation(SAN_FRANCISCO)
   server.use(
     http.post(REPORT_URL, () =>
-      errorResponse(400, 'invalid_request', 'timezone: unknown IANA timezone'),
+      errorResponse(400, 'invalid_request', 'location_label: Input should be a valid string'),
     ),
   )
 
@@ -302,7 +299,7 @@ test('keeps the saved location when the browser-made parts of the request are re
     screen.getByRole('button', { name: '📍 San Francisco ▾' }),
   ).toBeInTheDocument()
   expect(savedLocation()).toEqual(SAN_FRANCISCO)
-  expect(document.body).not.toHaveTextContent('unknown IANA timezone')
+  expect(document.body).not.toHaveTextContent('Input should be a valid string')
 })
 
 test('leaves the report area empty when the first report fails', async () => {
@@ -776,7 +773,7 @@ const GREAT_CONJUNCTION = {
   magnitude: null,
   event: {
     event_type: 'conjunction',
-    // Shown in the browser's time zone: 3:11 PM in Los Angeles, where the tests run.
+    // Shown in the place's time zone: 3:11 PM in QUIET_NIGHT's Los Angeles.
     peak_time: '2020-12-21T23:11:00Z',
     related_object_names: ['Jupiter', 'Saturn'],
   },
@@ -839,7 +836,7 @@ const MARS_OPPOSITION = {
   magnitude: -2.6,
   event: {
     event_type: 'opposition',
-    // Shown in the browser's time zone: 9:55 PM in Los Angeles, where the tests run.
+    // Shown in the place's time zone: 9:55 PM in QUIET_NIGHT's Los Angeles.
     peak_time: '2020-10-14T04:55:00Z',
     related_object_names: ['Mars'],
   },
@@ -891,7 +888,7 @@ const PERSEIDS = {
   magnitude: null,
   event: {
     event_type: 'meteor_shower',
-    // Shown in the browser's time zone: 1:20 AM in Los Angeles, where the tests run.
+    // Shown in the place's time zone: 1:20 AM in QUIET_NIGHT's Los Angeles.
     peak_time: '2026-08-13T08:20:00Z',
     related_object_names: ['Perseus'],
   },
@@ -1103,10 +1100,66 @@ test("shows the Viewing Window's start and end in local time", async () => {
 
   const section = await screen.findByRole('region', { name: 'Also visible tonight' })
 
-  // 02:30 and 13:10 UTC, in Los Angeles where the tests run.
-  expect(section).toHaveTextContent('Dark from 6:30 PM to 5:10 AM')
+  // 02:30 and 13:10 UTC, in Los Angeles: the place's zone, and the one the tests run in, so it
+  // needs no label.
+  expect(section).toHaveTextContent(/^Also visible tonightDark from 6:30 PM to 5:10 AMShow all/)
   expect(within(section).getByText('6:30 PM')).toHaveAttribute(
     'datetime',
     QUIET_NIGHT.viewing_window.starts_at,
   )
+})
+
+// The same night as THREE_CARD_NIGHT, reported for a place in Tokyo, while the browser (where
+// the tests run) is in Los Angeles.
+const TOKYO_NIGHT = { ...THREE_CARD_NIGHT, timezone: 'Asia/Tokyo', date: '2026-11-04' }
+
+test("shows every time in the place's zone, not the browser's, each naming that zone", async () => {
+  geolocateToNewYork()
+  respondWith(TOKYO_NIGHT)
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+
+  // 02:30 and 13:10 UTC are 11:30 AM and 10:10 PM in Tokyo.
+  expect(section).toHaveTextContent('Dark from 11:30 AM GMT+9 to 10:10 PM GMT+9')
+  fireEvent.click(within(section).getByRole('button', { name: 'Show all 2' }))
+  // The Moon rises at 04:51 and sets at 18:30 UTC.
+  expect(within(section).getByRole('row', { name: /Moon/ })).toHaveTextContent(
+    '1:51 PM GMT+93:30 AM GMT+9',
+  )
+  const card = screen.getByRole('article', { name: 'The king climbs the east' })
+  fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
+  expect(detailsOf(card)).toHaveTextContent('Rises1:51 PM GMT+9')
+  expect(detailsOf(card)).toHaveTextContent('Sets3:30 AM GMT+9')
+})
+
+test("names each time's own offset when the place's clock changes overnight", async () => {
+  geolocateToNewYork()
+  // New York's clocks fall back at 06:00 UTC on 1 November 2026, between dusk and dawn.
+  respondWith({
+    ...THREE_CARD_NIGHT,
+    timezone: 'America/New_York',
+    viewing_window: { starts_at: '2026-11-01T00:00:00Z', ends_at: '2026-11-01T10:00:00Z' },
+  })
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+
+  expect(section).toHaveTextContent('Dark from 8:00 PM EDT to 5:00 AM EST')
+})
+
+test("shows a Significant Event's peak in the place's zone", async () => {
+  geolocateToNewYork()
+  respondWith({
+    ...QUIET_NIGHT,
+    timezone: 'Asia/Tokyo',
+    highlights: [{ ...GREAT_CONJUNCTION, mini_headline: 'The great conjunction', paragraph: 'J.' }],
+  })
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'The great conjunction' })
+  fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
+
+  // 23:11 UTC on 21 December is 8:11 the next morning in Tokyo.
+  expect(detailsOf(card)).toHaveTextContent('Peak8:11 AM GMT+9')
 })

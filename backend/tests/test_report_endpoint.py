@@ -1,3 +1,4 @@
+import datetime as dt
 import re
 from collections.abc import Iterator
 
@@ -7,11 +8,11 @@ from fastapi.testclient import TestClient
 from app import main
 from app.main import app
 from app.narrator import Narration, NarrationCard, NarrationError, get_narrator
+from app.place import get_now
 
 VALID_REQUEST = {
     "latitude": 40.7167,
     "longitude": -74.0,
-    "timezone": "America/New_York",
     "date": "2026-06-21",
     "location_label": None,
 }
@@ -19,7 +20,6 @@ VALID_REQUEST = {
 QUIET_NIGHT_REQUEST = {
     "latitude": 69.65,
     "longitude": 18.96,
-    "timezone": "Europe/Oslo",
     "date": "2026-06-21",
     "location_label": None,
 }
@@ -110,9 +110,7 @@ def test_viewing_window_is_returned_in_utc(client: TestClient):
         pytest.param({"latitude": None}, id="latitude-null"),
         pytest.param({"longitude": 180.1}, id="longitude-too-high"),
         pytest.param({"longitude": -180.1}, id="longitude-too-low"),
-        pytest.param(
-            {"latitude": 90.1, "timezone": "Mars/Olympus_Mons"}, id="latitude-and-timezone"
-        ),
+        pytest.param({"latitude": 90.1, "date": "2026-13-01"}, id="latitude-and-date"),
     ],
 )
 def test_invalid_location_returns_400_error_envelope(
@@ -128,13 +126,10 @@ def test_invalid_location_returns_400_error_envelope(
     assert narrator.received is None
 
 
-# The browser, not the user, supplies the timezone and date, so a bad one is not the place's fault.
+# A bad date or label is not the place's fault.
 @pytest.mark.parametrize(
     "bad_fields",
     [
-        pytest.param({"timezone": "Mars/Olympus_Mons"}, id="timezone-unknown"),
-        pytest.param({"timezone": "America"}, id="timezone-is-a-directory"),
-        pytest.param({"timezone": "../secrets"}, id="timezone-path-traversal"),
         pytest.param({"date": "2026-13-01"}, id="date-impossible-month"),
         pytest.param({"date": "2026-02-30"}, id="date-impossible-day"),
         pytest.param({"date": "21/06/2026"}, id="date-wrong-format"),
@@ -164,8 +159,6 @@ def test_invalid_request_returns_400_error_envelope(
     [
         ("latitude", "invalid_location"),
         ("longitude", "invalid_location"),
-        ("timezone", "invalid_request"),
-        ("date", "invalid_request"),
     ],
 )
 def test_missing_field_returns_400_error_envelope(
@@ -177,6 +170,65 @@ def test_missing_field_returns_400_error_envelope(
 
     assert response.status_code == 400
     assert response.json()["error"]["type"] == error_type
+
+
+# Tokyo on 2026-11-05. Tokyo's noon is 03:00 UTC; New York's noon, 17:00 UTC, is already 02:00 the
+# next morning in Tokyo, deep in its darkness, which used to cut the Viewing Window short.
+TOKYO_REQUEST = {"latitude": 35.68, "longitude": 139.69, "date": "2026-11-05"}
+
+
+def test_report_is_computed_in_the_places_timezone(client: TestClient):
+    response = client.post("/api/report", json=TOKYO_REQUEST)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["timezone"] == "Asia/Tokyo"
+    assert body["date"] == "2026-11-05"
+    # Astronomical dusk in Tokyo is about 18:10 JST (09:10 UTC); dawn about 04:40 JST (19:40 UTC).
+    assert re.fullmatch(r"2026-11-05T09:\d\d:\d\dZ", body["viewing_window"]["starts_at"])
+    assert re.fullmatch(r"2026-11-05T19:\d\d:\d\dZ", body["viewing_window"]["ends_at"])
+
+
+def test_a_timezone_sent_by_an_old_client_is_ignored(client: TestClient):
+    response = client.post("/api/report", json={**TOKYO_REQUEST, "timezone": "America/New_York"})
+
+    assert response.status_code == 200
+    assert response.json()["timezone"] == "Asia/Tokyo"
+
+
+@pytest.mark.parametrize(
+    ("place", "timezone", "local_date"),
+    [
+        # 20:00 UTC on 2026-11-05 is 15:00 that day in New York, and 05:00 the next day in Tokyo.
+        pytest.param(
+            {"latitude": 40.7167, "longitude": -74.0}, "America/New_York", "2026-11-05", id="NYC"
+        ),
+        pytest.param(
+            {"latitude": 35.68, "longitude": 139.69}, "Asia/Tokyo", "2026-11-06", id="TYO"
+        ),
+    ],
+)
+def test_without_a_date_the_report_is_for_the_places_local_date(
+    client: TestClient, place: dict, timezone: str, local_date: str
+):
+    app.dependency_overrides[get_now] = lambda: dt.datetime(2026, 11, 5, 20, tzinfo=dt.UTC)
+
+    response = client.post("/api/report", json=place)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["timezone"] == timezone
+    assert body["date"] == local_date
+    assert body["viewing_window"]["starts_at"].startswith(local_date)
+
+
+def test_open_ocean_gets_its_nautical_timezone(client: TestClient):
+    response = client.post(
+        "/api/report", json={"latitude": 0.0, "longitude": -140.0, "date": "2026-11-05"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["timezone"] == "Etc/GMT+9"
 
 
 def test_malformed_json_returns_400_error_envelope(client: TestClient):

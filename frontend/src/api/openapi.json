@@ -206,13 +206,16 @@
             "minimum": -180.0,
             "title": "Longitude"
           },
-          "timezone": {
-            "type": "string",
-            "title": "Timezone"
-          },
           "date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Date"
           },
           "location_label": {
@@ -230,14 +233,22 @@
         "type": "object",
         "required": [
           "latitude",
-          "longitude",
-          "timezone",
-          "date"
+          "longitude"
         ],
-        "title": "ReportRequest"
+        "title": "ReportRequest",
+        "description": "A place to report on. Its timezone is looked up from where it is, never sent."
       },
       "ReportResponse": {
         "properties": {
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
           "headline": {
             "type": "string",
             "title": "Headline"
@@ -262,6 +273,8 @@
         },
         "type": "object",
         "required": [
+          "timezone",
+          "date",
           "headline",
           "viewing_window",
           "highlights",
