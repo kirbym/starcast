@@ -110,17 +110,9 @@ def test_viewing_window_is_returned_in_utc(client: TestClient):
         pytest.param({"latitude": None}, id="latitude-null"),
         pytest.param({"longitude": 180.1}, id="longitude-too-high"),
         pytest.param({"longitude": -180.1}, id="longitude-too-low"),
-        pytest.param({"timezone": "Mars/Olympus_Mons"}, id="timezone-unknown"),
-        pytest.param({"timezone": "America"}, id="timezone-is-a-directory"),
-        pytest.param({"timezone": "../secrets"}, id="timezone-path-traversal"),
-        pytest.param({"date": "2026-13-01"}, id="date-impossible-month"),
-        pytest.param({"date": "2026-02-30"}, id="date-impossible-day"),
-        pytest.param({"date": "21/06/2026"}, id="date-wrong-format"),
-        pytest.param({"date": "20260621"}, id="date-compact-iso"),
-        pytest.param({"date": "2026-06-21T00:00:00"}, id="date-with-time"),
-        pytest.param({"date": 1781000000}, id="date-timestamp"),
-        pytest.param({"date": "1700-01-01"}, id="date-before-ephemeris"),
-        pytest.param({"date": "2300-01-01"}, id="date-after-ephemeris"),
+        pytest.param(
+            {"latitude": 90.1, "timezone": "Mars/Olympus_Mons"}, id="latitude-and-timezone"
+        ),
     ],
 )
 def test_invalid_location_returns_400_error_envelope(
@@ -136,13 +128,55 @@ def test_invalid_location_returns_400_error_envelope(
     assert narrator.received is None
 
 
-def test_missing_field_returns_400_error_envelope(client: TestClient):
-    request = {key: value for key, value in VALID_REQUEST.items() if key != "timezone"}
+# The browser, not the user, supplies the timezone and date, so a bad one is not the place's fault.
+@pytest.mark.parametrize(
+    "bad_fields",
+    [
+        pytest.param({"timezone": "Mars/Olympus_Mons"}, id="timezone-unknown"),
+        pytest.param({"timezone": "America"}, id="timezone-is-a-directory"),
+        pytest.param({"timezone": "../secrets"}, id="timezone-path-traversal"),
+        pytest.param({"date": "2026-13-01"}, id="date-impossible-month"),
+        pytest.param({"date": "2026-02-30"}, id="date-impossible-day"),
+        pytest.param({"date": "21/06/2026"}, id="date-wrong-format"),
+        pytest.param({"date": "20260621"}, id="date-compact-iso"),
+        pytest.param({"date": "2026-06-21T00:00:00"}, id="date-with-time"),
+        pytest.param({"date": 1781000000}, id="date-timestamp"),
+        pytest.param({"date": "1700-01-01"}, id="date-before-ephemeris"),
+        pytest.param({"date": "2300-01-01"}, id="date-after-ephemeris"),
+        pytest.param({"location_label": 42}, id="label-not-a-string"),
+    ],
+)
+def test_invalid_request_returns_400_error_envelope(
+    client: TestClient, narrator: FakeNarrator, bad_fields: dict
+):
+    response = client.post("/api/report", json={**VALID_REQUEST, **bad_fields})
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["statusCode"] == 400
+    assert error["type"] == "invalid_request"
+    assert error["message"]
+    assert narrator.received is None
+
+
+@pytest.mark.parametrize(
+    ("missing", "error_type"),
+    [
+        ("latitude", "invalid_location"),
+        ("longitude", "invalid_location"),
+        ("timezone", "invalid_request"),
+        ("date", "invalid_request"),
+    ],
+)
+def test_missing_field_returns_400_error_envelope(
+    client: TestClient, missing: str, error_type: str
+):
+    request = {key: value for key, value in VALID_REQUEST.items() if key != missing}
 
     response = client.post("/api/report", json=request)
 
     assert response.status_code == 400
-    assert response.json()["error"]["type"] == "invalid_location"
+    assert response.json()["error"]["type"] == error_type
 
 
 def test_malformed_json_returns_400_error_envelope(client: TestClient):
@@ -151,7 +185,7 @@ def test_malformed_json_returns_400_error_envelope(client: TestClient):
     )
 
     assert response.status_code == 400
-    assert response.json()["error"]["type"] == "invalid_location"
+    assert response.json()["error"]["type"] == "invalid_request"
 
 
 def test_browser_on_the_frontend_origin_may_post_a_report(client: TestClient):

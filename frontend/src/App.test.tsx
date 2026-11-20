@@ -235,6 +235,7 @@ async function changeFromSanFranciscoToTokyo(tokyoResponse: () => Response) {
 test.each([
   [502, 'narration_failed'],
   [500, 'internal_error'],
+  [400, 'invalid_request'],
 ])(
   'rolls back to the last good location when a location change fails with %i',
   async (status, type) => {
@@ -282,6 +283,26 @@ test('asks for another place when the location is rejected', async () => {
   expect(logged).toHaveBeenCalledWith(
     expect.stringContaining('latitude: out of range'),
   )
+})
+
+test('keeps the saved location when the browser-made parts of the request are rejected', async () => {
+  // The browser supplies the timezone and date; one the backend can't use says nothing about the place.
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  saveLocation(SAN_FRANCISCO)
+  server.use(
+    http.post(REPORT_URL, () =>
+      errorResponse(400, 'invalid_request', 'timezone: unknown IANA timezone'),
+    ),
+  )
+
+  renderApp()
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/try searching again/i)
+  expect(
+    screen.getByRole('button', { name: '📍 San Francisco ▾' }),
+  ).toBeInTheDocument()
+  expect(savedLocation()).toEqual(SAN_FRANCISCO)
+  expect(document.body).not.toHaveTextContent('unknown IANA timezone')
 })
 
 test('leaves the report area empty when the first report fails', async () => {
