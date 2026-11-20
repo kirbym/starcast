@@ -6,8 +6,10 @@ from skyfield.api import Loader, load, wgs84
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 
-from app.astronomy import CATALOG, EPHEMERIS_FILE, Catalog, compute_night_sky, data_dir
+from app.astronomy import compute_night_sky
+from app.catalog import CATALOG, Catalog
 from app.comets import PINNED_ELEMENTS_ENV
+from app.observation import EPHEMERIS_FILE, data_dir
 from tests.conftest import PINNED_COMET_ELEMENTS
 
 # Published values: USNO "Astronomical Twilight for 2026" tables, retrieved 2026-11-04 from

@@ -8,7 +8,7 @@ from zoneinfo import available_timezones
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, Field
 
-from app.astronomy import ViewingWindow, VisibleBody
+from app.sky import ViewingWindow, VisibleBody
 
 # Whole years inside DE440s's coverage (December 1849 to January 2150).
 _EARLIEST_YEAR = 1850

@@ -7,7 +7,6 @@ import anthropic
 import httpx
 import pytest
 
-from app.astronomy import Highlight, SignificantEvent, VisibleBody
 from app.narrator import (
     BANNED_PHRASES,
     HIGHLIGHT_FIELDS,
@@ -16,6 +15,7 @@ from app.narrator import (
     Narration,
     NarrationError,
 )
+from app.sky import Highlight, SignificantEvent, VisibleBody
 
 
 class FakeClient:
