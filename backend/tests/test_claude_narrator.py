@@ -73,14 +73,13 @@ def test_a_failed_call_or_unusable_reply_is_a_narration_error(outcome):
 
 
 def test_asks_for_thinking_off_with_a_server_side_fallback():
-    # "between_tools" is how this Sonnet turns thinking off ("disabled" is a 400), and it is
-    # a 400 above effort "high". See docs/adr/0001-narrator-server-side-fallback.md.
+    # See docs/adr/0001-narrator-thinking-off-and-fallback.md.
     client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
 
     ClaudeNarrator(client).narrate([])
 
     assert client.request["thinking"] == {"type": "between_tools"}
-    assert client.request["output_config"].get("effort", "high") in {"low", "medium", "high"}
+    assert "effort" not in client.request["output_config"]
     assert client.request["fallbacks"] == "default"
     assert SERVER_SIDE_FALLBACK_BETA in client.request["betas"]
 
