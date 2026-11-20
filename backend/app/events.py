@@ -4,8 +4,9 @@ Each detector finds its event and where and when to look for it, and one constru
 into the night's Significant Event Highlight.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Self
 
 import numpy as np
 from skyfield import almanac
@@ -22,7 +23,7 @@ from app.observation import (
     setting_after,
     to_utc,
 )
-from app.sky import Highlight, SignificantEvent, VisibleBody
+from app.sky import Highlight, NarrationContext, SignificantEvent, VisibleBody
 
 # Two bodies at most this far apart, both above the horizon at that moment, are in conjunction.
 CONJUNCTION_LIMIT_DEGREES = 2.0
@@ -111,25 +112,24 @@ def _conjunction(first: Observation, second: Observation, samples: Time) -> _Con
     if separation > CONJUNCTION_LIMIT_DEGREES:
         return None
     pair = (first.body, second.body)
-    body = VisibleBody(
-        id=f"significant_event:conjunction_{first.catalog_body.key}_{second.catalog_body.key}",
-        category=3,
-        object_type="significant_event",
-        name=f"{first.body.name} and {second.body.name} in conjunction",
-        # The pair stands within a couple of degrees of the first body: look there.
-        peak_altitude_degrees=float(first.track.altitudes_degrees[closest]),
-        azimuth_at_peak_degrees=float(first.track.azimuths_degrees[closest]),
-        # The span over which both bodies are up together.
-        rises_at=max((body.rises_at for body in pair if body.rises_at), default=None),
-        sets_at=min((body.sets_at for body in pair if body.sets_at), default=None),
-        magnitude=None,
-        event=SignificantEvent(
+    highlight = _event_highlight(
+        SignificantEvent(
             event_type="conjunction",
             peak_time=to_utc(samples[closest]),
             related_object_names=(first.body.name, second.body.name),
         ),
+        key=f"{first.catalog_body.key}_{second.catalog_body.key}",
+        name=f"{first.body.name} and {second.body.name} in conjunction",
+        where=_WhereToLook(
+            # The pair stands within a couple of degrees of the first body: look there.
+            peak_altitude_degrees=float(first.track.altitudes_degrees[closest]),
+            azimuth_at_peak_degrees=float(first.track.azimuths_degrees[closest]),
+            # The span over which both bodies are up together.
+            rises_at=max((body.rises_at for body in pair if body.rises_at), default=None),
+            sets_at=min((body.sets_at for body in pair if body.sets_at), default=None),
+        ),
+        context={"separation_degrees": round(separation, 2)},
     )
-    highlight = Highlight(body, context={"separation_degrees": round(separation, 2)})
     return _Conjunction(separation, highlight)
 
 
@@ -167,19 +167,17 @@ def _opposition_moment(body: CatalogBody, local_noon: datetime) -> Time | None:
 def _opposition_highlight(seen: Observation, moment: Time) -> Highlight:
     """The opposition's Highlight: the Planet itself, best seen at its Peak Altitude."""
     planet = seen.body
-    body = replace(
-        planet,
-        id=f"significant_event:opposition_{seen.catalog_body.key}",
-        category=3,
-        object_type="significant_event",
-        name=f"{planet.name} at opposition",
-        event=SignificantEvent(
+    return _event_highlight(
+        SignificantEvent(
             event_type="opposition",
             peak_time=to_utc(seen.peak_time),
             related_object_names=(planet.name,),
         ),
+        key=seen.catalog_body.key,
+        name=f"{planet.name} at opposition",
+        where=_WhereToLook.at(planet),
+        context={"opposition_time": to_utc(moment).isoformat()},
     )
-    return Highlight(body, context={"opposition_time": to_utc(moment).isoformat()})
 
 
 def _strongest_meteor_shower(showers: tuple[MeteorShower, ...], night: Night) -> Highlight | None:
@@ -237,20 +235,68 @@ def _meteor_shower_highlight(shower: MeteorShower, night: Night) -> Highlight | 
     }
     if shower.zhr_note:
         context["zhr_note"] = shower.zhr_note
-    body = VisibleBody(
-        id=f"significant_event:meteor_shower_{shower.key}",
-        category=3,
-        object_type="significant_event",
-        name=f"{shower.name} meteor shower",
-        peak_altitude_degrees=peak.altitude_degrees,
-        azimuth_at_peak_degrees=peak.azimuth_degrees,
-        rises_at=rising_before(night.observer, shower.radiant, peak.time),
-        sets_at=setting_after(night.observer, shower.radiant, peak.time),
-        magnitude=None,
-        event=SignificantEvent(
+    return _event_highlight(
+        SignificantEvent(
             event_type="meteor_shower",
             peak_time=to_utc(peak.time),
             related_object_names=(shower.radiant_constellation,),
         ),
+        key=shower.key,
+        name=f"{shower.name} meteor shower",
+        where=_WhereToLook(
+            peak_altitude_degrees=peak.altitude_degrees,
+            azimuth_at_peak_degrees=peak.azimuth_degrees,
+            rises_at=rising_before(night.observer, shower.radiant, peak.time),
+            sets_at=setting_after(night.observer, shower.radiant, peak.time),
+        ),
+        context=context,
+    )
+
+
+@dataclass(frozen=True)
+class _WhereToLook:
+    """Where and when to look for a Significant Event: its Highlight's positional fields."""
+
+    peak_altitude_degrees: float
+    azimuth_at_peak_degrees: float
+    rises_at: datetime | None
+    sets_at: datetime | None
+    magnitude: float | None = None
+
+    @classmethod
+    def at(cls, body: VisibleBody) -> Self:
+        """Look where a Visible body is, as for a Planet at opposition."""
+        return cls(
+            peak_altitude_degrees=body.peak_altitude_degrees,
+            azimuth_at_peak_degrees=body.azimuth_at_peak_degrees,
+            rises_at=body.rises_at,
+            sets_at=body.sets_at,
+            magnitude=body.magnitude,
+        )
+
+
+def _event_highlight(
+    event: SignificantEvent,
+    *,
+    key: str,
+    name: str,
+    where: _WhereToLook,
+    context: NarrationContext,
+) -> Highlight:
+    """The night's Significant Event Highlight: a Category 3 Visible body for the event itself.
+
+    `key` tells this event from others of its type, as in "jupiter_saturn" for a conjunction.
+    """
+    body = VisibleBody(
+        id=f"significant_event:{event.event_type}_{key}",
+        category=3,
+        object_type="significant_event",
+        name=name,
+        peak_altitude_degrees=where.peak_altitude_degrees,
+        azimuth_at_peak_degrees=where.azimuth_at_peak_degrees,
+        rises_at=where.rises_at,
+        sets_at=where.sets_at,
+        magnitude=where.magnitude,
+        event=event,
     )
     return Highlight(body, context)
