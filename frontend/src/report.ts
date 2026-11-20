@@ -43,9 +43,14 @@ export async function fetchReport(location: Location): Promise<CosmicReport> {
   return response.json()
 }
 
-/** The error `type`s the backend's `{error: {statusCode, type, message}}` envelope can carry. */
+/**
+ * The error `type`s the backend's `{error: {statusCode, type, message}}` envelope can carry.
+ * `invalid_location` blames the user's place (its latitude or longitude); `invalid_request` blames
+ * the rest of the request, which the browser made, so the place is still good.
+ */
 const REPORT_ERROR_TYPES = [
   'invalid_location',
+  'invalid_request',
   'narration_failed',
   'internal_error',
 ] as const

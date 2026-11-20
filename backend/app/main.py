@@ -51,13 +51,22 @@ app.add_middleware(
 )
 
 
+# The fields the user chose. The browser fills in the rest (the timezone and date), so a request
+# rejected only for those is `invalid_request`: the place itself is fine, and the frontend keeps it.
+_LOCATION_FIELDS = {"latitude", "longitude"}
+
+
 @app.exception_handler(RequestValidationError)
-def invalid_location(_request: Request, exc: RequestValidationError) -> JSONResponse:
+def invalid_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
     problems = "; ".join(
         f"{'.'.join(str(part) for part in error['loc'][1:]) or 'body'}: {error['msg']}"
-        for error in exc.errors()
+        for error in errors
     )
-    return _error(400, "invalid_location", problems)
+    location_at_fault = any(
+        len(error["loc"]) > 1 and error["loc"][1] in _LOCATION_FIELDS for error in errors
+    )
+    return _error(400, "invalid_location" if location_at_fault else "invalid_request", problems)
 
 
 @app.exception_handler(NarrationError)
