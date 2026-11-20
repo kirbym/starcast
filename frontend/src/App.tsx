@@ -9,6 +9,7 @@ import {
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
 import PlaceSearch from './PlaceSearch.tsx'
+import { PlaceTimeZone } from './placeTimeZone.ts'
 import {
   fetchReport,
   ReportError,
@@ -161,13 +162,13 @@ function App() {
             <h1 className="headline">{report.report.headline}</h1>
             {/* A Quiet Night is just its Headline: no cards, and no Detail Layer. */}
             {report.report.highlights.length > 0 && (
-              <>
+              <PlaceTimeZone value={report.report.timezone}>
                 <HighlightList highlights={report.report.highlights} />
                 <VisibleObjects
                   viewingWindow={report.report.viewing_window}
                   objects={notHighlighted(report.report)}
                 />
-              </>
+              </PlaceTimeZone>
             )}
           </div>
         )}

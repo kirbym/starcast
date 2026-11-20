@@ -83,12 +83,22 @@ export interface components {
             /** Paragraph */
             paragraph: string;
         };
-        /** ReportRequest */
+        /**
+         * ReportRequest
+         * @description A place to report on. Its timezone is looked up from where it is, never sent.
+         */
         ReportRequest: {
             /** Latitude */
             latitude: number;
             /** Longitude */
             longitude: number;
+            /** Date */
+            date?: string | null;
+            /** Location Label */
+            location_label?: string | null;
+        };
+        /** ReportResponse */
+        ReportResponse: {
             /** Timezone */
             timezone: string;
             /**
@@ -96,11 +106,6 @@ export interface components {
              * Format: date
              */
             date: string;
-            /** Location Label */
-            location_label?: string | null;
-        };
-        /** ReportResponse */
-        ReportResponse: {
             /** Headline */
             headline: string;
             viewing_window: components["schemas"]["ViewingWindow"];

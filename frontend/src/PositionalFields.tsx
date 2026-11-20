@@ -1,11 +1,14 @@
+import { usePlaceTimeZone } from './placeTimeZone.ts'
 import type { VisibleBody } from './report.ts'
 
-/** The moment in the browser's time zone, like "3:11 PM". Reports are requested for that same
- * zone (see report.ts), so it is the zone the night was computed for. */
+/** The moment in the place's time zone, like "3:11 PM": the night is the place's, so its clock
+ * is the one to read, even when the browser is somewhere else. */
 export function LocalTime({ moment }: { moment: string }) {
+  const timeZone = usePlaceTimeZone()
   const text = new Date(moment).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone,
   })
   return <time dateTime={moment}>{text}</time>
 }

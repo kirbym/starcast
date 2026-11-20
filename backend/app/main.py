@@ -2,8 +2,10 @@ import logging
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import fields
+from datetime import datetime
 from time import sleep
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -12,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from app.astronomy import compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
+from app.place import get_now, place_timezone
 from app.schemas import HighlightCard, ReportRequest, ReportResponse
 from app.sky import Highlight, VisibleBody
 
@@ -51,8 +54,8 @@ app.add_middleware(
 )
 
 
-# The fields the user chose. The browser fills in the rest (the timezone and date), so a request
-# rejected only for those is `invalid_request`: the place itself is fine, and the frontend keeps it.
+# The fields the user chose. A request rejected only for the rest (the date or the label) is
+# `invalid_request`: the place itself is fine, and the frontend keeps it.
 _LOCATION_FIELDS = {"latitude", "longitude"}
 
 
@@ -83,13 +86,12 @@ def health() -> dict[str, str]:
 def create_report(
     report_request: ReportRequest,
     narrator: Annotated[Narrator, Depends(get_narrator)],
+    now: Annotated[datetime, Depends(get_now)],
 ) -> ReportResponse:
-    sky = compute_night_sky(
-        report_request.latitude,
-        report_request.longitude,
-        report_request.timezone,
-        report_request.date,
-    )
+    # The night is the place's own: its timezone, and its date, not the requester's.
+    timezone = place_timezone(report_request.latitude, report_request.longitude)
+    local_date = report_request.date or now.astimezone(ZoneInfo(timezone)).date()
+    sky = compute_night_sky(report_request.latitude, report_request.longitude, timezone, local_date)
     try:
         headline, cards = _narrate(narrator, sky.highlights)
     except NarrationError as first_failure:
@@ -97,6 +99,8 @@ def create_report(
         sleep(NARRATION_RETRY_DELAY_SECONDS)
         headline, cards = _narrate(narrator, sky.highlights)
     return ReportResponse(
+        timezone=timezone,
+        date=local_date,
         headline=headline,
         viewing_window=sky.viewing_window,
         highlights=cards,

@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.115",
     "pandas>=2.2",
     "skyfield>=1.55",
+    "timezonefinder>=9.2.0",
     "tzdata>=2026.6",
     "uvicorn[standard]>=0.32",
 ]
