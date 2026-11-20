@@ -2,6 +2,7 @@
 
 import datetime as dt
 from functools import cache
+from zoneinfo import ZoneInfo
 
 from timezonefinder import TimezoneFinder
 
@@ -24,6 +25,11 @@ def place_timezone(latitude: float, longitude: float) -> str:
     # Etc/GMT zones are signed the POSIX way: Etc/GMT+9 is nine hours behind UTC.
     offset = -round(longitude / 15)
     return "Etc/GMT" if offset == 0 else f"Etc/GMT{offset:+d}"
+
+
+def place_local_date(timezone: str, now: dt.datetime) -> dt.date:
+    """The place's own date at `now`, which may differ from the requester's."""
+    return now.astimezone(ZoneInfo(timezone)).date()
 
 
 def get_now() -> dt.datetime:

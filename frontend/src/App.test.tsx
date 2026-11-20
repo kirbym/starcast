@@ -1113,7 +1113,7 @@ test("shows the Viewing Window's start and end in local time", async () => {
 // the tests run) is in Los Angeles.
 const TOKYO_NIGHT = { ...THREE_CARD_NIGHT, timezone: 'Asia/Tokyo', date: '2026-11-04' }
 
-test("shows every time in the place's zone, not the browser's, and names that zone", async () => {
+test("shows every time in the place's zone, not the browser's, each naming that zone", async () => {
   geolocateToNewYork()
   respondWith(TOKYO_NIGHT)
   renderApp()
@@ -1121,16 +1121,31 @@ test("shows every time in the place's zone, not the browser's, and names that zo
   const section = await screen.findByRole('region', { name: 'Also visible tonight' })
 
   // 02:30 and 13:10 UTC are 11:30 AM and 10:10 PM in Tokyo.
-  expect(section).toHaveTextContent('Dark from 11:30 AM to 10:10 PM, local time (GMT+9)')
+  expect(section).toHaveTextContent('Dark from 11:30 AM GMT+9 to 10:10 PM GMT+9')
   fireEvent.click(within(section).getByRole('button', { name: 'Show all 2' }))
   // The Moon rises at 04:51 and sets at 18:30 UTC.
   expect(within(section).getByRole('row', { name: /Moon/ })).toHaveTextContent(
-    '1:51 PM3:30 AM',
+    '1:51 PM GMT+93:30 AM GMT+9',
   )
   const card = screen.getByRole('article', { name: 'The king climbs the east' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
-  expect(detailsOf(card)).toHaveTextContent('Rises1:51 PM')
-  expect(detailsOf(card)).toHaveTextContent('Sets3:30 AM')
+  expect(detailsOf(card)).toHaveTextContent('Rises1:51 PM GMT+9')
+  expect(detailsOf(card)).toHaveTextContent('Sets3:30 AM GMT+9')
+})
+
+test("names each time's own offset when the place's clock changes overnight", async () => {
+  geolocateToNewYork()
+  // New York's clocks fall back at 06:00 UTC on 1 November 2026, between dusk and dawn.
+  respondWith({
+    ...THREE_CARD_NIGHT,
+    timezone: 'America/New_York',
+    viewing_window: { starts_at: '2026-11-01T00:00:00Z', ends_at: '2026-11-01T10:00:00Z' },
+  })
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+
+  expect(section).toHaveTextContent('Dark from 8:00 PM EDT to 5:00 AM EST')
 })
 
 test("shows a Significant Event's peak in the place's zone", async () => {
@@ -1146,5 +1161,5 @@ test("shows a Significant Event's peak in the place's zone", async () => {
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
 
   // 23:11 UTC on 21 December is 8:11 the next morning in Tokyo.
-  expect(detailsOf(card)).toHaveTextContent('Peak8:11 AM')
+  expect(detailsOf(card)).toHaveTextContent('Peak8:11 AM GMT+9')
 })

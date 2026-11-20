@@ -1,16 +1,10 @@
-import { usePlaceTimeZone } from './placeTimeZone.ts'
+import { placeTime, usePlaceTimeZone } from './placeTimeZone.ts'
 import type { VisibleBody } from './report.ts'
 
-/** The moment in the place's time zone, like "3:11 PM": the night is the place's, so its clock
- * is the one to read, even when the browser is somewhere else. */
+/** The moment on the place's clock, like "3:11 PM": the night is the place's, so its clock is the
+ * one to read, even when the browser is somewhere else (see placeTime). */
 export function LocalTime({ moment }: { moment: string }) {
-  const timeZone = usePlaceTimeZone()
-  const text = new Date(moment).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone,
-  })
-  return <time dateTime={moment}>{text}</time>
+  return <time dateTime={moment}>{placeTime(moment, usePlaceTimeZone())}</time>
 }
 
 const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']

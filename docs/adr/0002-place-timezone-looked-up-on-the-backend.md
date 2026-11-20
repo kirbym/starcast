@@ -1,4 +1,4 @@
-# 2. The backend looks up a place's timezone and its date tonight
+# 2. The backend looks up a place's timezone and local date
 
 Date: 2026-11-20 · Status: accepted · Issue: #53
 
@@ -21,14 +21,18 @@ Nominatim doesn't return one.
   (`app/place.py`). Its boundary data ships with the package, so the lookup is offline. Open ocean
   gets a nautical zone such as `Etc/GMT+9`.
 - `POST /api/report` no longer takes a `timezone`, and one sent anyway is ignored. `date` is
-  optional and defaults to today at the place, so the browser's date never decides which night it
-  is.
+  optional and defaults to today at the place. The frontend no longer sends it, so the browser's
+  date doesn't decide which night it is.
 - The response carries the `timezone` and `date` the night was computed for. The frontend shows
-  every time in that zone. When the place's clock differs from the viewer's, the Viewing Window line
-  names the zone (e.g. "local time (GMT+9)").
+  every time in that zone. A time whose zone reads differently from the viewer's at that moment
+  names the zone, like "1:51 PM GMT+9", so a clock change overnight shows too.
 
 ## Consequences
 
 - One place to get the zone right, and no client can send a wrong one.
-- The backend gains a dependency (~a few MB of boundary data, loaded once, on the first report).
+- The backend gains a dependency whose boundary data is loaded once, on the first report.
 - Timezone boundaries change now and then. Keeping `timezonefinder` current keeps them right.
+- A cached frontend from before this change still sends the browser's `date`, which is honoured.
+  Until it reloads, it can get a night a day off for a place far away, as before.
+- A report requested after midnight at the place is for the coming evening, not the darkness under
+  way. That is unchanged from when the browser's date decided.

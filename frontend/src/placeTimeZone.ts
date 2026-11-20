@@ -8,17 +8,27 @@ export function usePlaceTimeZone(): string | undefined {
   return useContext(PlaceTimeZone)
 }
 
-/** The place's zone, like "GMT+9", when the browser's clock reads differently at `moment`; null
- * when they agree, so the times need no label. */
-export function usePlaceZoneLabel(moment: string): string | null {
-  const timeZone = usePlaceTimeZone()
-  if (timeZone === undefined) return null
-  const place = zoneName(timeZone, moment)
-  return place === zoneName(undefined, moment) ? null : (place ?? timeZone)
+/** The moment on the place's clock, like "3:11 PM". When the browser's clock reads a different
+ * zone at that moment, the place's zone is named too, like "3:11 PM GMT+9", so a time is never
+ * mistaken for the viewer's own. Each moment is labelled for itself, so a clock change overnight
+ * shows as one. */
+export function placeTime(moment: string, timeZone: string | undefined): string {
+  const date = new Date(moment)
+  const named = zoneName(date, timeZone) !== zoneName(date, browserTimeZone())
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+    timeZoneName: named ? 'short' : undefined,
+  })
 }
 
-function zoneName(timeZone: string | undefined, moment: string): string | undefined {
+function browserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+function zoneName(date: Date, timeZone: string | undefined): string | undefined {
   return new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: 'short' })
-    .formatToParts(new Date(moment))
+    .formatToParts(date)
     .find((part) => part.type === 'timeZoneName')?.value
 }

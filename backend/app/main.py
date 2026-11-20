@@ -5,7 +5,6 @@ from dataclasses import fields
 from datetime import datetime
 from time import sleep
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -14,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.astronomy import compute_night_sky
 from app.narrator import Narration, NarrationError, Narrator, get_narrator
-from app.place import get_now, place_timezone
+from app.place import get_now, place_local_date, place_timezone
 from app.schemas import HighlightCard, ReportRequest, ReportResponse
 from app.sky import Highlight, VisibleBody
 
@@ -90,7 +89,7 @@ def create_report(
 ) -> ReportResponse:
     # The night is the place's own: its timezone, and its date, not the requester's.
     timezone = place_timezone(report_request.latitude, report_request.longitude)
-    local_date = report_request.date or now.astimezone(ZoneInfo(timezone)).date()
+    local_date = report_request.date or place_local_date(timezone, now)
     sky = compute_night_sky(report_request.latitude, report_request.longitude, timezone, local_date)
     try:
         headline, cards = _narrate(narrator, sky.highlights)

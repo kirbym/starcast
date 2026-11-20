@@ -20,7 +20,7 @@ export type ViewingWindow = Schemas['ViewingWindow']
 export type CosmicReport = Schemas['ReportResponse']
 
 /** Request tonight's Cosmic Report for a location. The backend finds the place's timezone and
- * tonight's date there; the report's `timezone` says which zone its times belong to. */
+ * its local date; the report's `timezone` says which zone its times belong to. */
 export async function fetchReport(location: Location): Promise<CosmicReport> {
   const response = await fetch(`${API_BASE_URL}/api/report`, {
     method: 'POST',

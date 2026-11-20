@@ -1,13 +1,5 @@
 import { useId, useState } from 'react'
-import {
-  Altitude,
-  Azimuth,
-  LocalTime,
-  Magnitude,
-  RiseTime,
-  SetTime,
-} from './PositionalFields.tsx'
-import { usePlaceZoneLabel } from './placeTimeZone.ts'
+import { Altitude, Azimuth, LocalTime, Magnitude, RiseTime, SetTime } from './PositionalFields.tsx'
 import type { VisibleBody, ViewingWindow } from './report.ts'
 
 /** The Detail Layer's shared part, shown once below the cards: the night's Viewing Window, and
@@ -24,14 +16,12 @@ export function VisibleObjects({
   const [expanded, setExpanded] = useState(false)
   const headingId = useId()
   const listId = useId()
-  const zoneLabel = usePlaceZoneLabel(viewingWindow.starts_at)
   return (
     <section className="visible-objects" aria-labelledby={headingId}>
       <h2 id={headingId}>Also visible tonight</h2>
       <p className="viewing-window">
         Dark from <LocalTime moment={viewingWindow.starts_at} /> to{' '}
         <LocalTime moment={viewingWindow.ends_at} />
-        {zoneLabel && `, local time (${zoneLabel})`}
       </p>
       {objects.length > 0 && (
         <button
