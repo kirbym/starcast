@@ -10,6 +10,7 @@ import pytest
 from app.narrator import (
     BANNED_PHRASES,
     HIGHLIGHT_FIELDS,
+    SERVER_SIDE_FALLBACK_BETA,
     SYSTEM_PROMPT,
     ClaudeNarrator,
     Narration,
@@ -69,6 +70,18 @@ def test_a_failed_call_or_unusable_reply_is_a_narration_error(outcome):
 
     with pytest.raises(NarrationError):
         narrator.narrate([])
+
+
+def test_asks_for_thinking_off_with_a_server_side_fallback():
+    # See docs/adr/0001-narrator-thinking-off-and-fallback.md.
+    client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
+
+    ClaudeNarrator(client).narrate([])
+
+    assert client.request["thinking"] == {"type": "between_tools"}
+    assert "effort" not in client.request["output_config"]
+    assert client.request["fallbacks"] == "default"
+    assert SERVER_SIDE_FALLBACK_BETA in client.request["betas"]
 
 
 def test_every_banned_phrase_reaches_the_system_prompt():

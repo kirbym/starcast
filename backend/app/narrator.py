@@ -176,9 +176,12 @@ class ClaudeNarrator:
                     }
                 ],
                 output_config={"format": {"type": "json_schema", "schema": NARRATION_SCHEMA}},
-                # Sonnet thinks by default. Off saves tokens, and thinking counts against
-                # MAX_TOKENS.
+                # Thinking off: Sonnet thinks by default, and thinking counts against MAX_TOKENS.
+                # On Sonnet 5.5 "between_tools" is how thinking is turned off ("disabled" is a
+                # 400). It needs effort high or below, so effort stays at its default, high.
                 thinking={"type": "between_tools"},
+                # On some refusals the API retries this request on Sonnet 5, thinking still off.
+                # See docs/adr/0001-narrator-thinking-off-and-fallback.md.
                 betas=[SERVER_SIDE_FALLBACK_BETA],
                 fallbacks="default",
             )
