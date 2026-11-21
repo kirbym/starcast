@@ -1040,7 +1040,7 @@ test('says a body does not rise or set tonight when those times are null, and da
   expect(within(andromeda).getByLabelText('No magnitude')).toHaveTextContent('—')
 })
 
-test('shows no shared list of the other Visible objects', async () => {
+test('shows no shared list of the other Visible bodies', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
@@ -1053,7 +1053,7 @@ test('shows no shared list of the other Visible objects', async () => {
 
 /** The line directly under the Headline. */
 async function sublineOfHeadline() {
-  const headline = await screen.findByRole('heading', { name: THREE_CARD_NIGHT.headline })
+  const headline = await screen.findByRole('heading', { level: 1 })
   return headline.nextElementSibling as HTMLElement
 }
 
