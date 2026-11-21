@@ -41,10 +41,10 @@ Pass scenario names to run only those. With none, all four run.
 
 | scenario | what it checks |
 |---|---|
-| `san-francisco` | Location granted: Headline shown, exactly 1 POST, local date |
-| `denied` | Location denied: alert shown, no POST, so no Claude cost |
+| `san-francisco` | Location granted: Headline shown, exactly 1 POST |
+| `denied` | Location denied: place search shown, no POST, so no Claude cost |
 | `phone` | London at 390px wide: Headline shown, no horizontal scroll |
-| `no-darkness` | London with the clock at midsummer: zero-length Viewing Window |
+| `no-darkness` | London on midsummer night: zero-length Viewing Window |
 
 Every scenario also fails on a console error or a non-200 report.
 
@@ -81,8 +81,9 @@ With `ANTHROPIC_API_KEY` set, the backend suite also makes one real Claude call.
 
 ## Gotchas
 
+- **The stub copies the Narrator's reply by hand.** `startStubClaude` in `driver.mjs` writes one card per Highlight id it is sent, matching `NARRATION_SCHEMA` in `backend/app/narrator.py` and `_merge_cards` in `backend/app/main.py`. Change either and update the stub too, or every stubbed report returns 500.
 - **Location is simulated.** The driver grants Chrome a fixed position, so the browser's permission prompt and the machine's real location are never exercised.
-- **Astronomy depends on today's date.** Only `no-darkness` fixes the clock, and it does so in the page only, by changing the date the page sends. Other scenarios report tonight, so their output changes daily.
+- **Astronomy depends on today's date.** Only `no-darkness` fixes the date: the page sends none, so the driver adds `date` to its POST. Other scenarios report tonight, so their output changes daily.
 - **Dev server only.** The driver runs Vite in dev mode, not the production build. That helps one check: `StrictMode` runs effects twice in dev, so the "exactly 1 POST" check catches doubled Claude calls.
 - **Worktrees have no `.env`.** It is untracked, so `--env-file ../.env` fails in a worktree. Pass the main checkout's path, or use the driver.
 - **`VITE_API_BASE_URL` comes from the root `.env`.** Vite reads it through `envDir: '..'`, so in a worktree set it in the environment, or the page POSTs to its own origin.
@@ -90,6 +91,8 @@ With `ANTHROPIC_API_KEY` set, the backend suite also makes one real Claude call.
 
 ## Troubleshooting
 
+- **`page.waitForSelector: Timeout 45000ms exceeded`**: the page never reached the scenario's selector, usually because the report POST returned 500. The driver doesn't print backend output, so start the backend by hand (human path) and POST to it: `curl -X POST localhost:8000/api/report -H 'content-type: application/json' -d '{"latitude":37.7749,"longitude":-122.4194}'`. The traceback is in the server's output.
+- **`.venv\Scripts\python.exe: No module named uv`**: the backend venv is activated, so `python` is the venv's, which has no uv. Deactivate it, or put a Python that has uv first on PATH.
 - **`npm error Unknown cli flags: --port, --strictPort`**: PowerShell's `npm.ps1` swallows the `--` in `npm run dev -- --port 5173`. Call Vite directly with `npx vite`.
 - **`error: No environment file found at: D:starcast.env`**: the backslashes were stripped from `D:\starcast\.env`. Use forward slashes.
 - **`http://localhost:8000/health is already in use`**: an earlier server is still running. Stop it, then rerun:

@@ -30,7 +30,8 @@ const SCENARIOS = {
   },
   denied: {
     context: { timezoneId: 'America/Los_Angeles' },
-    expect: { selector: '[role=alert]', posts: 0 },
+    // Denied asks for a place instead of scolding, so no alert: just the place search.
+    expect: { selector: '#set-location-title', posts: 0 },
   },
   phone: {
     context: {
@@ -48,7 +49,8 @@ const SCENARIOS = {
       permissions: ['geolocation'],
       timezoneId: 'Europe/London',
     },
-    now: '2026-06-21T20:00:00Z',
+    // The page sends no date (the backend uses the place's own today), so the driver adds one.
+    date: '2026-06-21',
     expect: { selector: 'h1', posts: 1, zeroLengthWindow: true },
   },
 }
@@ -69,9 +71,19 @@ function findEnvFile() {
 
 function startStubClaude() {
   const server = createServer((request, response) => {
-    request.resume()
+    const chunks = []
+    request.on('data', (chunk) => chunks.push(chunk))
     request.on('end', () => {
-      const report = { headline: 'A stubbed sky, quiet tonight.', cards: [] }
+      // The backend needs exactly one card per Highlight, matched by id. The Narrator sends the
+      // Highlights as a JSON array in the user message.
+      const body = JSON.parse(Buffer.concat(chunks).toString())
+      const highlights = JSON.parse(body.messages[0].content)
+      const cards = highlights.map(({ id }) => ({
+        id,
+        mini_headline: `Stubbed ${id}`,
+        paragraph: 'A stubbed paragraph, no Claude call made.',
+      }))
+      const report = { headline: 'A stubbed sky, quiet tonight.', cards }
       response.setHeader('content-type', 'application/json')
       response.end(
         JSON.stringify({
@@ -138,13 +150,20 @@ async function waitUntilServing(url, started) {
   throw new Error(`${started.name} did not start:\n${started.output()}`)
 }
 
-async function runScenario(browser, name, { context, now, expect }) {
+async function runScenario(browser, name, { context, date, expect }) {
   const browserContext = await browser.newContext({
     viewport: { width: 1280, height: 720 },
     ...context,
   })
   const page = await browserContext.newPage()
-  if (now) await page.clock.setFixedTime(now)
+  if (date) {
+    await page.route('**/api/report', (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.continue()
+      const postData = JSON.stringify({ ...request.postDataJSON(), date })
+      return route.continue({ postData })
+    })
+  }
 
   const posts = []
   const reports = []
