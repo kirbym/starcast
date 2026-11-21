@@ -876,33 +876,6 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
   expect(details).toHaveTextContent('Peak9:55 PM')
 })
 
-test("keeps a Significant Event card's related body in the shared list", async () => {
-  geolocateToNewYork()
-  const mars = {
-    ...JUPITER,
-    id: 'planet:mars',
-    name: 'Mars',
-    magnitude: -2.6,
-  } satisfies VisibleBody
-  respondWith({
-    ...QUIET_NIGHT,
-    highlights: [
-      { ...MARS_OPPOSITION, mini_headline: 'Mars at its brightest', paragraph: 'Mars burns.' },
-      { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
-    ],
-    visible_objects: [mars, JUPITER],
-  })
-  renderApp()
-
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
-  fireEvent.click(within(section).getByRole('button', { name: 'Show all 1' }))
-
-  // The opposition card describes the event, not Mars's own rise, set and magnitude, so Mars
-  // stays listed; Jupiter has its own card, so it does not.
-  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
-  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(['Mars'])
-})
-
 const PERSEIDS = {
   id: 'significant_event:meteor_shower_per',
   category: 3,
@@ -1118,6 +1091,41 @@ test('lists every Visible object not on a card once, in a shared section below t
 
   fireEvent.click(within(section).getByRole('button', { name: 'Hide' }))
   expect(within(section).queryByRole('table')).not.toBeInTheDocument()
+})
+
+// Mars itself, not the event: where and when to look for the planet on its opposition night.
+const MARS = {
+  id: 'planet:mars',
+  category: 1,
+  object_type: 'planet',
+  name: 'Mars',
+  peak_altitude_degrees: 49.2,
+  azimuth_at_peak_degrees: 180.4,
+  rises_at: '2020-10-13T22:43:12Z',
+  sets_at: '2020-10-14T11:18:40Z',
+  magnitude: -2.6,
+  event: null,
+} satisfies VisibleBody
+
+test("lists a Significant Event Highlight Card's related Visible bodies in the shared list", async () => {
+  geolocateToNewYork()
+  respondWith({
+    ...QUIET_NIGHT,
+    highlights: [
+      { ...MARS_OPPOSITION, mini_headline: 'Mars at its brightest', paragraph: 'Mars burns.' },
+      { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
+    ],
+    visible_objects: [MARS, JUPITER],
+  })
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+  fireEvent.click(within(section).getByRole('button', { name: 'Show all 1' }))
+
+  // The opposition's Highlight Card describes the event, not Mars's own rise, set and magnitude,
+  // so Mars stays listed; Jupiter has its own Highlight Card, so it does not.
+  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
+  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(['Mars'])
 })
 
 test("shows the Viewing Window's start and end in local time", async () => {
