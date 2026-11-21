@@ -876,6 +876,33 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
   expect(details).toHaveTextContent('Peak9:55 PM')
 })
 
+test("keeps a Significant Event card's related body in the shared list", async () => {
+  geolocateToNewYork()
+  const mars = {
+    ...JUPITER,
+    id: 'planet:mars',
+    name: 'Mars',
+    magnitude: -2.6,
+  } satisfies VisibleBody
+  respondWith({
+    ...QUIET_NIGHT,
+    highlights: [
+      { ...MARS_OPPOSITION, mini_headline: 'Mars at its brightest', paragraph: 'Mars burns.' },
+      { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
+    ],
+    visible_objects: [mars, JUPITER],
+  })
+  renderApp()
+
+  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+  fireEvent.click(within(section).getByRole('button', { name: 'Show all 1' }))
+
+  // The opposition card describes the event, not Mars's own rise, set and magnitude, so Mars
+  // stays listed; Jupiter has its own card, so it does not.
+  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
+  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(['Mars'])
+})
+
 const PERSEIDS = {
   id: 'significant_event:meteor_shower_per',
   category: 3,
