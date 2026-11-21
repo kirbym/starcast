@@ -103,7 +103,6 @@ def create_report(
         headline=headline,
         viewing_window=sky.viewing_window,
         highlights=cards,
-        visible_objects=sky.visible_objects,
     )
 
 

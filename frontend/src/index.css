@@ -121,6 +121,12 @@ h1,
   font-weight: 600;
 }
 
+/* The night's Viewing Window, a subline of the Headline. */
+.viewing-window {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
 .highlights {
   display: grid;
   gap: 1rem;
@@ -181,51 +187,6 @@ h1,
 
 .detail-layer dd {
   margin: 0;
-}
-
-/* Detail Layer, shared part: every Visible object, once, below the cards. */
-
-.visible-objects {
-  margin-top: 2rem;
-}
-
-.visible-objects h2 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.viewing-window {
-  margin: 0.25rem 0 0;
-  color: var(--muted);
-}
-
-.visible-objects-table {
-  margin-top: 0.75rem;
-  overflow-x: auto;
-}
-
-.visible-objects table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-
-.visible-objects th,
-.visible-objects td {
-  padding: 0.4rem 0.75rem 0.4rem 0;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-
-.visible-objects thead th {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.visible-objects tbody th {
-  font-weight: 600;
 }
 
 /* Skeleton. Each line is exactly one line box tall (the root line-height),

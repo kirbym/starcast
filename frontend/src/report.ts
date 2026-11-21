@@ -8,12 +8,12 @@ type Schemas = components['schemas']
 
 export type SignificantEvent = Schemas['SignificantEvent']
 
-/** A Visible body and its positional fields: one entry of `visible_objects`. `rises_at` is null
- * when the body never set before its peak, and `sets_at` when it stays up after it. */
-export type VisibleBody = Schemas['VisibleBody']
-
 /** What the Cosmic Report shows for one Highlight: its Visible body, mini-headline and paragraph. */
 export type HighlightCard = Schemas['HighlightCard']
+
+/** A Visible body and its positional fields: a Highlight Card without its prose. `rises_at` is
+ * null when the body never set before its peak, and `sets_at` when it stays up after it. */
+export type VisibleBody = Omit<HighlightCard, 'mini_headline' | 'paragraph'>
 
 export type ViewingWindow = Schemas['ViewingWindow']
 

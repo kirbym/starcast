@@ -9,17 +9,16 @@ import {
 import { placeName } from './nominatim.ts'
 import LocationControl from './LocationControl.tsx'
 import PlaceSearch from './PlaceSearch.tsx'
+import { LocalTime } from './PositionalFields.tsx'
 import { PlaceTimeZone } from './placeTimeZone.ts'
 import {
   fetchReport,
   ReportError,
   type CosmicReport,
   type ReportErrorType,
-  type VisibleBody,
 } from './report.ts'
 import ReportSkeleton from './ReportSkeleton.tsx'
 import Toast from './Toast.tsx'
-import { VisibleObjects } from './VisibleObjects.tsx'
 
 const GEOLOCATION_TIMEOUT_MS = 10_000
 const UNANSWERED_PROMPT_MS = 15_000
@@ -160,14 +159,14 @@ function App() {
         {report.status === 'ready' && (
           <div className="report">
             <h1 className="headline">{report.report.headline}</h1>
-            {/* A Quiet Night is just its Headline: no cards, and no Detail Layer. */}
+            {/* A Quiet Night is just its Headline: no Viewing Window and no cards. */}
             {report.report.highlights.length > 0 && (
               <PlaceTimeZone value={report.report.timezone}>
+                <p className="viewing-window">
+                  Dark from <LocalTime moment={report.report.viewing_window.starts_at} /> to{' '}
+                  <LocalTime moment={report.report.viewing_window.ends_at} />
+                </p>
                 <HighlightList highlights={report.report.highlights} />
-                <VisibleObjects
-                  viewingWindow={report.report.viewing_window}
-                  objects={notHighlighted(report.report)}
-                />
               </PlaceTimeZone>
             )}
           </div>
@@ -192,12 +191,6 @@ function tryAgainMessage(type: ReportErrorType, { label }: Location): string {
       ? 'the narrator lost the thread'
       : 'something went wrong on our end'
   return `Couldn't read ${sky} — ${reason}. Try searching again.`
-}
-
-/** The Visible objects without a Highlight Card: a highlighted object's details are on its card. */
-function notHighlighted({ highlights, visible_objects }: CosmicReport): VisibleBody[] {
-  const onCards = new Set(highlights.map((highlight) => highlight.id))
-  return visible_objects.filter((body) => !onCards.has(body.id))
 }
 
 export default App

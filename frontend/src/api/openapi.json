@@ -262,13 +262,6 @@
             },
             "type": "array",
             "title": "Highlights"
-          },
-          "visible_objects": {
-            "items": {
-              "$ref": "#/components/schemas/VisibleBody"
-            },
-            "type": "array",
-            "title": "Visible Objects"
           }
         },
         "type": "object",
@@ -277,8 +270,7 @@
           "date",
           "headline",
           "viewing_window",
-          "highlights",
-          "visible_objects"
+          "highlights"
         ],
         "title": "ReportResponse"
       },
@@ -381,107 +373,6 @@
           "ends_at"
         ],
         "title": "ViewingWindow"
-      },
-      "VisibleBody": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "category": {
-            "type": "integer",
-            "enum": [
-              1,
-              2,
-              3
-            ],
-            "title": "Category"
-          },
-          "object_type": {
-            "type": "string",
-            "enum": [
-              "planet",
-              "moon",
-              "constellation",
-              "bright_star",
-              "named_comet",
-              "dso",
-              "significant_event"
-            ],
-            "title": "Object Type"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "peak_altitude_degrees": {
-            "type": "number",
-            "title": "Peak Altitude Degrees"
-          },
-          "azimuth_at_peak_degrees": {
-            "type": "number",
-            "title": "Azimuth At Peak Degrees"
-          },
-          "rises_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rises At"
-          },
-          "sets_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sets At"
-          },
-          "magnitude": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Magnitude"
-          },
-          "event": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SignificantEvent"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "category",
-          "object_type",
-          "name",
-          "peak_altitude_degrees",
-          "azimuth_at_peak_degrees",
-          "rises_at",
-          "sets_at",
-          "magnitude"
-        ],
-        "title": "VisibleBody",
-        "description": "A catalog body that is Visible on the night, with its positional fields for the Detail Layer.\n\nA Significant Event Highlight has the same shape, with `event` set. Its positional fields say\nwhere and when to look for the event."
       }
     }
   }

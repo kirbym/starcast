@@ -74,6 +74,9 @@ class Highlight:
 
 @dataclass(frozen=True)
 class NightSky:
+    """The night's computed sky: its Viewing Window, its Highlights, and every Visible body the
+    Highlights were selected from. The Cosmic Report carries only the Highlights."""
+
     viewing_window: ViewingWindow
     highlights: list[Highlight] = field(default_factory=list)
     visible_objects: list[VisibleBody] = field(default_factory=list)

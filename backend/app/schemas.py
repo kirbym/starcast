@@ -50,4 +50,3 @@ class ReportResponse(BaseModel):
     headline: str
     viewing_window: ViewingWindow
     highlights: list[HighlightCard]
-    visible_objects: list[VisibleBody]

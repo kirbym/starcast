@@ -19,7 +19,7 @@ A catalog body whose center point (or centroid, for extended objects) reaches a 
 _Avoid_: "up", "observable", "detectable"
 
 **Visible body**:
-A catalog body that is Visible on a given night, together with where and when to look for it: its Peak Altitude, its azimuth at that peak, its rise and set times, and its magnitude. A Significant Event Highlight takes the same form, its positional data saying where and when to look for the event. The single list of Visible objects in the Detail Layer is a list of Visible bodies.
+A catalog body that is Visible on a given night, together with where and when to look for it: its Peak Altitude, its azimuth at that peak, its rise and set times, and its magnitude. A Significant Event Highlight takes the same form, its positional data saying where and when to look for the event. Each Highlight Card carries its Highlight's Visible body; the Cosmic Report does not list the night's other Visible bodies.
 _Avoid_: "sky object", "visible object" (as a name), "body" alone
 
 **Peak Altitude**:
@@ -96,9 +96,9 @@ _Avoid_: "comet", "periodic comet" (unnamed periodic comets are not in the catal
 ### UI
 
 **Casual Layer**:
-The default view of the Cosmic Report: the Headline and up to three Highlight Cards. No positional data is shown.
+The default view of the Cosmic Report: the Headline, the night's Viewing Window directly beneath it ("Dark from 6:30 PM to 5:10 AM"), and up to three Highlight Cards. No positional data is shown. A Quiet Night shows only its Headline.
 _Avoid_: "summary view", "simple view", "top-level view"
 
 **Detail Layer**:
-Two parts: (1) per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card, and (2) a single list of the night's other Visible objects, shown once, independent of any one card. Neither part duplicates the other's content: a Visible body shown on a Highlight Card is not repeated in the list, and every other Visible body is in it. A Significant Event's Highlight Card shows only the event, so the event's related Visible bodies (an opposition's planet, a conjunction's planets) are still listed.
+Per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card. A Significant Event's Highlight Card also shows the event's type, related bodies and peak time. The Viewing Window is in the Casual Layer, not here.
 _Avoid_: "advanced view", "expanded view", "data view"

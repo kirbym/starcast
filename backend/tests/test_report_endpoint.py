@@ -87,8 +87,13 @@ def test_quiet_night_returns_a_headline_and_no_bodies(client: TestClient, narrat
     body = response.json()
     assert body["headline"] == "A hush settles over tonight's sky."
     assert body["highlights"] == []
-    assert body["visible_objects"] == []
     assert narrator.received == []
+
+
+def test_report_carries_its_highlights_but_no_list_of_other_visible_bodies(client: TestClient):
+    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
+
+    assert set(response.json()) == {"timezone", "date", "headline", "viewing_window", "highlights"}
 
 
 def test_viewing_window_is_returned_in_utc(client: TestClient):
@@ -357,48 +362,6 @@ def test_narrator_receives_a_bright_stars_catalog_facts_as_context(
     assert 8 < context["distance_light_years"] < 9
 
 
-def test_every_visible_body_is_listed_with_highlights_included(client: TestClient):
-    response = client.post("/api/report", json=JUPITER_NIGHT_REQUEST)
-
-    visible = response.json()["visible_objects"]
-    ids = {body["id"] for body in visible}
-    assert {"planet:jupiter", "planet:mars", "planet:saturn", "moon:moon"} <= ids
-    assert {"constellation:and", "constellation:ori", "constellation:uma"} <= ids
-    assert {"bright_star:sirius", "bright_star:capella", "bright_star:polaris"} <= ids
-    assert {"dso:m31", "dso:m45", "dso:m42"} <= ids
-    assert "planet:venus" not in ids
-    assert "constellation:cru" not in ids
-    assert "bright_star:canopus" not in ids
-    categories = {
-        "planet": 1,
-        "moon": 1,
-        "constellation": 2,
-        "bright_star": 3,
-        "named_comet": 3,
-        "dso": 3,
-    }
-    for body in visible:
-        assert set(body) == POSITIONAL_FIELDS
-        assert body["category"] == categories[body["object_type"]]
-    sirius = next(body for body in visible if body["id"] == "bright_star:sirius")
-    assert sirius["magnitude"] == pytest.approx(-1.44)
-    assert sirius["peak_altitude_degrees"] > 0
-
-
-def test_bright_named_comet_is_listed_with_its_computed_magnitude(client: TestClient):
-    # 2020-07-20 from New York: Comet NEOWISE hangs low in the north-west after dusk.
-    response = client.post("/api/report", json={**VALID_REQUEST, "date": "2020-07-20"})
-
-    assert response.status_code == 200
-    comets = [
-        body for body in response.json()["visible_objects"] if body["object_type"] == "named_comet"
-    ]
-    assert [comet["id"] for comet in comets] == ["named_comet:neowise"]
-    assert comets[0]["category"] == 3
-    assert comets[0]["name"] == "Comet NEOWISE"
-    assert comets[0]["magnitude"] < 6.0
-
-
 # New York on 2020-12-21: the great conjunction of Jupiter and Saturn, low in the south-west.
 GREAT_CONJUNCTION_REQUEST = {**VALID_REQUEST, "date": "2020-12-21"}
 
@@ -433,14 +396,6 @@ def test_narrator_receives_the_conjunction_event_and_its_separation(
     assert received.body.event.event_type == "conjunction"
     assert received.body.event.related_object_names == ("Jupiter", "Saturn")
     assert received.context["separation_degrees"] == pytest.approx(0.10, abs=0.01)
-
-
-def test_conjunction_is_a_highlight_but_not_a_visible_object(client: TestClient):
-    response = client.post("/api/report", json=GREAT_CONJUNCTION_REQUEST)
-
-    visible = response.json()["visible_objects"]
-    assert {"planet:jupiter", "planet:saturn"} <= {body["id"] for body in visible}
-    assert all(body["event"] is None for body in visible)
 
 
 # New York on 2020-10-13: Mars reaches opposition that evening.

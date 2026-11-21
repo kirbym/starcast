@@ -24,7 +24,6 @@ const QUIET_NIGHT = {
     ends_at: '2026-11-04T13:10:00Z',
   },
   highlights: [],
-  visible_objects: [],
 }
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
@@ -619,7 +618,6 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
               'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
           },
         ],
-        visible_objects: [JUPITER],
       }),
     ),
   )
@@ -674,7 +672,6 @@ test('shows a planet and a constellation Highlight Card together, in Category or
             paragraph: 'Andromeda sails straight overhead in the evening, chained to her rock.',
           },
         ],
-        visible_objects: [JUPITER, ANDROMEDA],
       }),
     ),
   )
@@ -737,7 +734,6 @@ test('shows up to three Highlight Cards, one per Category, in Category order', a
             paragraph: 'Sirius, the brightest star of all, flashes low in the south before dawn.',
           },
         ],
-        visible_objects: [JUPITER, ANDROMEDA, SIRIUS],
       }),
     ),
   )
@@ -797,7 +793,6 @@ test('shows a Significant Event Highlight Card whose Detail Layer names its bodi
             paragraph: 'Jupiter and Saturn sink together in the south-west, nearly one light.',
           },
         ],
-        visible_objects: [],
       }),
     ),
   )
@@ -860,7 +855,6 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
             paragraph: 'Mars rises as the Sun sets and burns orange all night.',
           },
         ],
-        visible_objects: [],
       }),
     ),
   )
@@ -912,7 +906,6 @@ test('shows a meteor shower Highlight Card whose Detail Layer names the event, i
             paragraph: 'Swift streaks fly out of Perseus all night.',
           },
         ],
-        visible_objects: [],
       }),
     ),
   )
@@ -940,9 +933,6 @@ test('shows no Highlight Cards on a Quiet Night', async () => {
 
   const headline = await screen.findByRole('heading', { name: QUIET_NIGHT.headline })
   expect(screen.queryByRole('article')).not.toBeInTheDocument()
-  expect(
-    screen.queryByRole('region', { name: 'Also visible tonight' }),
-  ).not.toBeInTheDocument()
   // Only the Headline: no empty card list, no Viewing Window, no error styling.
   expect(headline.parentElement?.children).toHaveLength(1)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -978,21 +968,6 @@ const THREE_CARD_NIGHT = {
     { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
     { ...ANDROMEDA, mini_headline: 'The chained princess overhead', paragraph: 'Andromeda sails.' },
     { ...POLARIS, mini_headline: 'The pole star holds still', paragraph: 'Polaris waits.' },
-  ],
-  visible_objects: [
-    JUPITER,
-    { ...JUPITER, id: 'moon:moon', object_type: 'moon', name: 'Moon', magnitude: -11.2 },
-    ANDROMEDA,
-    {
-      ...ANDROMEDA,
-      id: 'constellation:cas',
-      name: 'Cassiopeia',
-      peak_altitude_degrees: 81.6,
-      azimuth_at_peak_degrees: 2.1,
-      rises_at: null,
-      sets_at: null,
-    },
-    POLARIS,
   ],
 }
 
@@ -1065,80 +1040,34 @@ test('says a body does not rise or set tonight when those times are null, and da
   expect(within(andromeda).getByLabelText('No magnitude')).toHaveTextContent('—')
 })
 
-test('lists every Visible object not on a card once, in a shared section below the cards', async () => {
+test('shows no shared list of the other Visible objects', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
-  const cards = screen.getAllByRole('article')
-  expect(
-    cards.at(-1)!.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy()
-  expect(within(section).queryByRole('table')).not.toBeInTheDocument()
+  await screen.findByRole('article', { name: 'The king climbs the east' })
 
-  fireEvent.click(within(section).getByRole('button', { name: 'Show all 2' }))
-
-  // Jupiter, Andromeda and Polaris are on cards, so their details stay there.
-  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
-  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual([
-    'Moon',
-    'Cassiopeia',
-  ])
-  expect(rows[0]).toHaveTextContent('55°132° SE8:51 PM10:30 AM−11.2')
-  expect(rows[1]).toHaveTextContent("82°2° NDoesn't rise tonightDoesn't set tonight—")
-  expect(within(rows[1]).getByLabelText('No magnitude')).toHaveTextContent(/^—$/)
-  expect(screen.getAllByRole('table')).toHaveLength(1)
-
-  fireEvent.click(within(section).getByRole('button', { name: 'Hide' }))
-  expect(within(section).queryByRole('table')).not.toBeInTheDocument()
+  expect(screen.queryByText('Also visible tonight')).not.toBeInTheDocument()
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument()
 })
 
-// Mars itself, not the event: where and when to look for the planet on its opposition night.
-const MARS = {
-  id: 'planet:mars',
-  category: 1,
-  object_type: 'planet',
-  name: 'Mars',
-  peak_altitude_degrees: 49.2,
-  azimuth_at_peak_degrees: 180.4,
-  rises_at: '2020-10-13T22:43:12Z',
-  sets_at: '2020-10-14T11:18:40Z',
-  magnitude: -2.6,
-  event: null,
-} satisfies VisibleBody
-
-test("lists a Significant Event Highlight Card's related Visible bodies in the shared list", async () => {
-  geolocateToNewYork()
-  respondWith({
-    ...QUIET_NIGHT,
-    highlights: [
-      { ...MARS_OPPOSITION, mini_headline: 'Mars at its brightest', paragraph: 'Mars burns.' },
-      { ...JUPITER, mini_headline: 'The king climbs the east', paragraph: 'Jupiter climbs.' },
-    ],
-    visible_objects: [MARS, JUPITER],
-  })
-  renderApp()
-
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
-  fireEvent.click(within(section).getByRole('button', { name: 'Show all 1' }))
-
-  // The opposition's Highlight Card describes the event, not Mars's own rise, set and magnitude,
-  // so Mars stays listed; Jupiter has its own Highlight Card, so it does not.
-  const rows = within(within(section).getByRole('table')).getAllByRole('row').slice(1)
-  expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(['Mars'])
-})
+/** The line directly under the Headline. */
+async function sublineOfHeadline() {
+  const headline = await screen.findByRole('heading', { name: THREE_CARD_NIGHT.headline })
+  return headline.nextElementSibling as HTMLElement
+}
 
 test("shows the Viewing Window's start and end in local time", async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
 
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
+  const subline = await sublineOfHeadline()
 
   // 02:30 and 13:10 UTC, in Los Angeles: the place's zone, and the one the tests run in, so it
   // needs no label.
-  expect(section).toHaveTextContent(/^Also visible tonightDark from 6:30 PM to 5:10 AMShow all/)
-  expect(within(section).getByText('6:30 PM')).toHaveAttribute(
+  expect(subline).toHaveTextContent(/^Dark from 6:30 PM to 5:10 AM$/)
+  expect(within(subline).getByText('6:30 PM')).toHaveAttribute(
     'datetime',
     QUIET_NIGHT.viewing_window.starts_at,
   )
@@ -1153,15 +1082,9 @@ test("shows every time in the place's zone, not the browser's, each naming that 
   respondWith(TOKYO_NIGHT)
   renderApp()
 
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
-
   // 02:30 and 13:10 UTC are 11:30 AM and 10:10 PM in Tokyo.
-  expect(section).toHaveTextContent('Dark from 11:30 AM GMT+9 to 10:10 PM GMT+9')
-  fireEvent.click(within(section).getByRole('button', { name: 'Show all 2' }))
-  // The Moon rises at 04:51 and sets at 18:30 UTC.
-  expect(within(section).getByRole('row', { name: /Moon/ })).toHaveTextContent(
-    '1:51 PM GMT+93:30 AM GMT+9',
-  )
+  expect(await sublineOfHeadline()).toHaveTextContent('Dark from 11:30 AM GMT+9 to 10:10 PM GMT+9')
+  // Jupiter rises at 04:51 and sets at 18:30 UTC.
   const card = screen.getByRole('article', { name: 'The king climbs the east' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
   expect(detailsOf(card)).toHaveTextContent('Rises1:51 PM GMT+9')
@@ -1178,9 +1101,7 @@ test("names each time's own offset when the place's clock changes overnight", as
   })
   renderApp()
 
-  const section = await screen.findByRole('region', { name: 'Also visible tonight' })
-
-  expect(section).toHaveTextContent('Dark from 8:00 PM EDT to 5:00 AM EST')
+  expect(await sublineOfHeadline()).toHaveTextContent('Dark from 8:00 PM EDT to 5:00 AM EST')
 })
 
 test("shows a Significant Event's peak in the place's zone", async () => {
