@@ -100,5 +100,5 @@ The default view of the Cosmic Report: the Headline and up to three Highlight Ca
 _Avoid_: "summary view", "simple view", "top-level view"
 
 **Detail Layer**:
-Two parts: (1) per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card, and (2) a single list of all Visible objects for the night, shown once, independent of any one card. Neither part duplicates the other's content.
+Two parts: (1) per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card, and (2) a single list of the night's other Visible objects, shown once, independent of any one card. Neither part duplicates the other's content: a Visible body shown on a Highlight Card is not repeated in the list, and every other Visible body is in it. A Significant Event's Highlight Card shows only the event, so the event's related Visible bodies (an opposition's planet, a conjunction's planets) are still listed.
 _Avoid_: "advanced view", "expanded view", "data view"
