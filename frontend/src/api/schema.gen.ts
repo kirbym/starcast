@@ -111,8 +111,6 @@ export interface components {
             viewing_window: components["schemas"]["ViewingWindow"];
             /** Highlights */
             highlights: components["schemas"]["HighlightCard"][];
-            /** Visible Objects */
-            visible_objects: components["schemas"]["VisibleBody"][];
         };
         /**
          * SignificantEvent
@@ -157,40 +155,6 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
-        };
-        /**
-         * VisibleBody
-         * @description A catalog body that is Visible on the night, with its positional fields for the Detail Layer.
-         *
-         *     A Significant Event Highlight has the same shape, with `event` set. Its positional fields say
-         *     where and when to look for the event.
-         */
-        VisibleBody: {
-            /** Id */
-            id: string;
-            /**
-             * Category
-             * @enum {integer}
-             */
-            category: 1 | 2 | 3;
-            /**
-             * Object Type
-             * @enum {string}
-             */
-            object_type: "planet" | "moon" | "constellation" | "bright_star" | "named_comet" | "dso" | "significant_event";
-            /** Name */
-            name: string;
-            /** Peak Altitude Degrees */
-            peak_altitude_degrees: number;
-            /** Azimuth At Peak Degrees */
-            azimuth_at_peak_degrees: number;
-            /** Rises At */
-            rises_at: string | null;
-            /** Sets At */
-            sets_at: string | null;
-            /** Magnitude */
-            magnitude: number | null;
-            event?: components["schemas"]["SignificantEvent"] | null;
         };
     };
     responses: never;

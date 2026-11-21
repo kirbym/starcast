@@ -14,10 +14,9 @@ def test_committed_openapi_document_matches_the_api():
     assert committed == app.openapi()
 
 
-def test_visible_body_category_and_object_type_reach_the_document():
-    schemas = app.openapi()["components"]["schemas"]
+def test_highlight_card_category_and_object_type_reach_the_document():
+    card = app.openapi()["components"]["schemas"]["HighlightCard"]["properties"]
 
-    visible_body = schemas["VisibleBody"]["properties"]
-    assert visible_body["category"]["enum"] == [1, 2, 3]
-    assert "named_comet" in visible_body["object_type"]["enum"]
-    assert {"mini_headline", "paragraph"} <= set(schemas["HighlightCard"]["properties"])
+    assert card["category"]["enum"] == [1, 2, 3]
+    assert "named_comet" in card["object_type"]["enum"]
+    assert {"mini_headline", "paragraph"} <= set(card)
