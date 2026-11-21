@@ -42,9 +42,9 @@ Pass scenario names to run only those. With none, all four run.
 | scenario | what it checks |
 |---|---|
 | `san-francisco` | Location granted: Headline shown, exactly 1 POST, local date |
-| `denied` | Location denied: alert shown, no POST, so no Claude cost |
+| `denied` | Location denied: place search shown, no POST, so no Claude cost |
 | `phone` | London at 390px wide: Headline shown, no horizontal scroll |
-| `no-darkness` | London with the clock at midsummer: zero-length Viewing Window |
+| `no-darkness` | London on midsummer night: zero-length Viewing Window |
 
 Every scenario also fails on a console error or a non-200 report.
 
@@ -82,7 +82,7 @@ With `ANTHROPIC_API_KEY` set, the backend suite also makes one real Claude call.
 ## Gotchas
 
 - **Location is simulated.** The driver grants Chrome a fixed position, so the browser's permission prompt and the machine's real location are never exercised.
-- **Astronomy depends on today's date.** Only `no-darkness` fixes the clock, and it does so in the page only, by changing the date the page sends. Other scenarios report tonight, so their output changes daily.
+- **Astronomy depends on today's date.** Only `no-darkness` fixes the date: the page sends none, so the driver adds `date` to its POST. Other scenarios report tonight, so their output changes daily.
 - **Dev server only.** The driver runs Vite in dev mode, not the production build. That helps one check: `StrictMode` runs effects twice in dev, so the "exactly 1 POST" check catches doubled Claude calls.
 - **Worktrees have no `.env`.** It is untracked, so `--env-file ../.env` fails in a worktree. Pass the main checkout's path, or use the driver.
 - **`VITE_API_BASE_URL` comes from the root `.env`.** Vite reads it through `envDir: '..'`, so in a worktree set it in the environment, or the page POSTs to its own origin.
