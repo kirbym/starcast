@@ -56,19 +56,7 @@ To cover a new behaviour, add an entry to `SCENARIOS` at the top of `driver.mjs`
 
 ## Run (human path)
 
-Two terminals. From `backend/`, with the `.env` path written with forward slashes:
-
-```powershell
-python -m uv run --env-file ../.env uvicorn app.main:app --port 8000
-```
-
-From `frontend/`:
-
-```powershell
-$env:VITE_API_BASE_URL = 'http://localhost:8000'; npx vite --port 5173 --strictPort
-```
-
-Open http://localhost:5173 and allow location. Stop each with Ctrl-C.
+To try the app by hand with real Claude, use the `run-starcast-live` skill. From your own terminal, run `node .claude/skills/run-starcast-live/serve.mjs`: it starts both servers, opens http://localhost:5173, and stops on Ctrl-C.
 
 ## Test
 
