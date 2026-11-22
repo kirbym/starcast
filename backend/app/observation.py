@@ -279,6 +279,7 @@ def _visible_body(
         rises_at=rising_before(observer, target, peak.time),
         sets_at=setting_after(observer, target, peak.time),
         magnitude=magnitude,
+        dso_type=body.dso_type,
     )
 
 

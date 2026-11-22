@@ -11,7 +11,7 @@ from typing import Literal
 from skyfield.api import Star
 
 from app.comets import NAMED_COMETS, NamedComet
-from app.sky import Category, NarrationContext, ObjectType
+from app.sky import Category, DsoType, NarrationContext, ObjectType
 
 Hemisphere = Literal["north", "south"]
 
@@ -37,6 +37,7 @@ class CatalogBody:
     # A fixed body's catalog magnitude. A moving body's is computed for the night instead.
     magnitude: float | None = None
     context: NarrationContext | None = None
+    dso_type: DsoType | None = None
 
     @property
     def id(self) -> str:
@@ -111,7 +112,7 @@ _SOLAR_SYSTEM = (
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
-def _read_data_file(name: str) -> list[dict[str, str]]:
+def read_data_file(name: str) -> list[dict[str, str]]:
     """The rows of a bundled CSV data file, skipping its `#` header comments."""
     with (_DATA_DIR / name).open(encoding="utf-8", newline="") as file:
         return list(csv.DictReader(line for line in file if not line.startswith("#")))
@@ -129,7 +130,7 @@ def _load_constellations() -> tuple[CatalogBody, ...]:
     """
     return tuple(
         CatalogBody("constellation", row["key"], row["name"], _fixed_point(row))
-        for row in _read_data_file("constellations.csv")
+        for row in read_data_file("constellations.csv")
     )
 
 
@@ -148,7 +149,7 @@ def _load_bright_stars() -> tuple[CatalogBody, ...]:
             magnitude=float(row["magnitude"]),
             context=_star_context(row),
         )
-        for row in _read_data_file("bright_stars.csv")
+        for row in read_data_file("bright_stars.csv")
     )
 
 
@@ -166,6 +167,23 @@ def _star_context(row: dict[str, str]) -> NarrationContext:
     return context
 
 
+# Each OpenNGC type that occurs in messier.csv, grouped into its DSO type.
+DSO_TYPES: dict[str, DsoType] = {
+    "galaxy": "galaxy",
+    "nebula": "nebula",
+    "emission nebula": "nebula",
+    "reflection nebula": "nebula",
+    "planetary nebula": "nebula",
+    "supernova remnant": "nebula",
+    "star cluster with nebula": "nebula",
+    "globular cluster": "globular_cluster",
+    "open cluster": "open_cluster",
+    "star cloud": "open_cluster",
+    "double star": "open_cluster",
+    "asterism": "open_cluster",
+}
+
+
 def _load_dsos() -> tuple[CatalogBody, ...]:
     """The DSOs, M1 to M110, each placed at its Centroid.
 
@@ -181,8 +199,9 @@ def _load_dsos() -> tuple[CatalogBody, ...]:
             _fixed_point(row),
             magnitude=float(row["magnitude"]),
             context=_dso_context(row),
+            dso_type=DSO_TYPES[row["type"]],
         )
-        for row in _read_data_file("messier.csv")
+        for row in read_data_file("messier.csv")
     )
 
 
@@ -217,7 +236,7 @@ def _load_meteor_showers() -> tuple[MeteorShower, ...]:
 
     The file is maintained by hand; see docs/research/meteor-shower-calendar.md.
     """
-    return tuple(_meteor_shower(row) for row in _read_data_file("meteor_showers.csv"))
+    return tuple(_meteor_shower(row) for row in read_data_file("meteor_showers.csv"))
 
 
 def _meteor_shower(row: dict[str, str]) -> MeteorShower:

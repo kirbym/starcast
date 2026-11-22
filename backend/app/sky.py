@@ -19,6 +19,11 @@ ObjectType = Literal[
 ]
 
 
+# What kind of DSO a DSO is, grouped from its detailed OpenNGC type. It picks the DSO's sprite and
+# its Highlight Card's kind label.
+DsoType = Literal["galaxy", "nebula", "globular_cluster", "open_cluster"]
+
+
 EventType = Literal["conjunction", "opposition", "meteor_shower"]
 
 
@@ -61,6 +66,8 @@ class VisibleBody:
     sets_at: datetime | None
     magnitude: float | None
     event: SignificantEvent | None = None
+    # Set for a DSO, and None for every other kind of body.
+    dso_type: DsoType | None = None
 
 
 @dataclass(frozen=True)

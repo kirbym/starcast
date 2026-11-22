@@ -952,6 +952,28 @@ const ANDROMEDA_GALAXY = {
   id: 'dso:m31',
   object_type: 'dso',
   name: 'Andromeda Galaxy',
+  dso_type: 'galaxy',
+} satisfies VisibleBody
+
+const CRAB_NEBULA = {
+  ...ANDROMEDA_GALAXY,
+  id: 'dso:m1',
+  name: 'Crab Nebula',
+  dso_type: 'nebula',
+} satisfies VisibleBody
+
+const HERCULES_CLUSTER = {
+  ...ANDROMEDA_GALAXY,
+  id: 'dso:m13',
+  name: 'Great Globular Cluster in Hercules',
+  dso_type: 'globular_cluster',
+} satisfies VisibleBody
+
+const PLEIADES = {
+  ...ANDROMEDA_GALAXY,
+  id: 'dso:m45',
+  name: 'Pleiades',
+  dso_type: 'open_cluster',
 } satisfies VisibleBody
 
 test.each([
@@ -960,7 +982,10 @@ test.each([
   ['a constellation', ANDROMEDA, 'Constellation'],
   ['a bright star', SIRIUS, 'Bright Star'],
   ['a named comet', COMET, 'Comet'],
-  ['a deep-sky object', ANDROMEDA_GALAXY, 'Deep-Sky Object'],
+  ['a galaxy', ANDROMEDA_GALAXY, 'Galaxy'],
+  ['a nebula', CRAB_NEBULA, 'Nebula'],
+  ['a globular cluster', HERCULES_CLUSTER, 'Globular Cluster'],
+  ['an open cluster', PLEIADES, 'Open Cluster'],
   ['a conjunction', GREAT_CONJUNCTION, 'Conjunction'],
   ['an opposition', MARS_OPPOSITION, 'Opposition'],
   ['a meteor shower', PERSEIDS, 'Meteor Shower'],
