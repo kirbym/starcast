@@ -6,21 +6,39 @@ import { KindSprite } from './KindSprite.tsx'
 
 type MotionPreference = 'no-preference' | 'reduce'
 
-/** Applies index.css as a viewer with this prefers-reduced-motion setting sees it. jsdom skips
- * @media rules, so the matching blocks are unwrapped into plain rules and the rest dropped. */
-function applyStylesheet(preference: MotionPreference) {
+/** index.css's top-level rules, parsed by jsdom. */
+function stylesheetRules() {
   const parsed = document.createElement('style')
   parsed.textContent = css
   document.head.append(parsed)
-  const rules = Array.from(parsed.sheet!.cssRules).flatMap((rule) => {
+  const rules = Array.from(parsed.sheet!.cssRules)
+  parsed.remove()
+  return rules
+}
+
+/** Applies index.css as a viewer with this prefers-reduced-motion setting sees it. jsdom skips
+ * @media rules, so the matching blocks are unwrapped into plain rules and the rest dropped. */
+function applyStylesheet(preference: MotionPreference) {
+  const rules = stylesheetRules().flatMap((rule) => {
     if (!(rule instanceof CSSMediaRule)) return [rule.cssText]
     const matches = rule.conditionText.replaceAll(' ', '') === `(prefers-reduced-motion:${preference})`
     return matches ? Array.from(rule.cssRules, (inner) => inner.cssText) : []
   })
-  parsed.remove()
   const applied = document.createElement('style')
   applied.textContent = rules.join('\n')
   document.head.append(applied)
+}
+
+/** The keyframes rules index.css declares, by name. */
+function keyframesRules() {
+  const keyframes = stylesheetRules().filter(
+    (rule): rule is CSSKeyframesRule => rule instanceof CSSKeyframesRule,
+  )
+  return new Map(keyframes.map((rule) => [rule.name, rule]))
+}
+
+function isAnimated(name: string) {
+  return name !== 'none'
 }
 
 afterEach(() => {
@@ -39,20 +57,6 @@ function animationsOf(sprite: Element) {
       timing: tokens.find((token) => /^(ease|linear|step)/.test(token)) ?? 'ease',
     }
   })
-}
-
-const isAnimated = (name: string) => name !== 'none'
-
-/** The keyframes rules index.css declares, by name. */
-function keyframesRules() {
-  const parsed = document.createElement('style')
-  parsed.textContent = css
-  document.head.append(parsed)
-  const keyframes = Array.from(parsed.sheet!.cssRules).filter(
-    (rule): rule is CSSKeyframesRule => rule instanceof CSSKeyframesRule,
-  )
-  parsed.remove()
-  return new Map(keyframes.map((rule) => [rule.name, rule]))
 }
 
 test.each(KINDS)('the %s sprite animates when motion is allowed', (kind) => {

@@ -237,7 +237,7 @@ h1 {
 }
 
 .sprite-flicker {
-  animation: sprite-flicker 2.4s ease-in-out infinite;
+  animation: sprite-flicker 4s ease-in-out infinite;
 }
 
 @keyframes sprite-flicker {
@@ -246,7 +246,7 @@ h1 {
     opacity: 1;
   }
   50% {
-    opacity: 0.15;
+    opacity: 0.3;
   }
 }
 
@@ -279,7 +279,7 @@ h1 {
 }
 
 .sprite-shimmer {
-  animation: sprite-shimmer 3.2s ease-in-out infinite;
+  animation: sprite-shimmer 5s ease-in-out infinite;
 }
 
 @keyframes sprite-shimmer {

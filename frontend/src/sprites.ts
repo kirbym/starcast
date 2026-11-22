@@ -29,7 +29,7 @@ export type PaletteColor = keyof typeof PALETTE
 /** How a whole layer moves, each named after its `sprite-<motion>` class in index.css. They
  * change only opacity, or position by whole pixels, so every pixel stays crisp:
  * - twinkle: each star dims now and then, the stars at staggered times
- * - flicker: fades out and back quickly
+ * - flicker: fades most of the way out and back
  * - pulse: fades out and back slowly
  * - breathe: dims a little and back, very slowly
  * - shimmer: wavers in brightness
@@ -1042,7 +1042,6 @@ export const SPRITES: Record<Kind, Sprite> = {
       },
       {
         name: 'stars',
-        motion: 'twinkle',
         grid: [
           '..............................',
           '..............................',
