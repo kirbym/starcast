@@ -77,6 +77,10 @@ _Avoid_: "solar body", "planet candidate"
 Earth's natural satellite. Treated as a Category 1 candidate and outranks every Planet via Visual Priority on nights when it is Visible and at least 50% illuminated.
 _Avoid_: "lunar body", "the Moon" (use just "Moon" in code/copy)
 
+**Moon Phase**:
+The Moon's illuminated fraction (0 at new, 1 at full) and whether it is waxing or waning, taken at its Peak Altitude. Only the Moon's Visible body carries one. It decides the Moon's Visual Priority (at least half lit, it outranks every Planet), is given to the Narrator, and picks the frame of the Moon's Kind Sprite.
+_Avoid_: "lunation", "lunar phase", "illumination"
+
 **Named Constellation**:
 One of the 88 IAU-recognized constellations, represented in the catalog by its centroid RA/Dec. Treated as a Category 2 candidate.
 _Avoid_: "star pattern", "asterism" (asterisms are not Named Constellations)
@@ -108,5 +112,5 @@ Per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnit
 _Avoid_: "advanced view", "expanded view", "data view"
 
 **Kind Sprite**:
-The square pixel-art image of a kind of Visible body, shown centered above a Highlight Card's title in the Casual Layer: a generic planet for a Planet, stars joined by lines for a Named Constellation, and so on. There is one for each of the twelve kinds a Highlight Card's title can be labeled with: Planet, Moon, Constellation, Bright Star, Comet, each DSO type, and each Significant Event type. It always agrees with that label, and is decorative: it depicts the kind, never the particular body or the night (the Moon's is not that night's phase). Each one loops a slow, subtle animation (a Planet spins, a Constellation's stars twinkle), and holds still for a viewer who prefers reduced motion.
+The square pixel-art image of a kind of Visible body, shown centered above a Highlight Card's title in the Casual Layer: a generic planet for a Planet, stars joined by lines for a Named Constellation, and so on. There is one for each of the twelve kinds a Highlight Card's title can be labeled with: Planet, Moon, Constellation, Bright Star, Comet, each DSO type, and each Significant Event type. It always agrees with that label, and is decorative: it depicts the kind, never the particular body or the night, with one exception: the Moon's shows that night's Moon Phase, drawn as one of eight phases (new, waxing and waning crescent, first and last quarter, waxing and waning gibbous, full), lit on the right while waxing as seen from the northern hemisphere. Each one loops a slow, subtle animation (a Planet spins, a Constellation's stars twinkle), and holds still for a viewer who prefers reduced motion.
 _Avoid_: "icon", "thumbnail", "illustration", "picture"

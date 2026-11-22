@@ -45,7 +45,7 @@ function Card({ highlight }: { highlight: HighlightCard }) {
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
       <div className="highlight-card-summary">
-        {kind && <KindSprite kind={kind} />}
+        {kind && <KindSprite kind={kind} moonPhase={highlight.moon_phase} />}
         <h2 id={headingId}>
           {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
         </h2>

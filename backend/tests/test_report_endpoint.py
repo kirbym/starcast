@@ -271,6 +271,7 @@ POSITIONAL_FIELDS = {
     "magnitude",
     "event",
     "dso_type",
+    "moon_phase",
 }
 
 
@@ -287,7 +288,20 @@ def test_highlight_carries_its_narrated_card_and_positional_fields(client: TestC
     assert highlight["mini_headline"] == "Jupiter takes the stage"
     assert highlight["paragraph"] == "A story about Jupiter."
     assert highlight["event"] is None
+    assert highlight["moon_phase"] is None
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", highlight["rises_at"])
+
+
+def test_moon_highlight_carries_its_phase(client: TestClient):
+    # 2026-11-23 from New York: the Moon, hours short of full, outranks every Planet.
+    response = client.post("/api/report", json={**VALID_REQUEST, "date": "2026-11-23"})
+
+    assert response.status_code == 200
+    moon = response.json()["highlights"][0]
+    assert moon["id"] == "moon:moon"
+    assert set(moon) == POSITIONAL_FIELDS | {"mini_headline", "paragraph"}
+    assert moon["moon_phase"]["illuminated_fraction"] > 0.97
+    assert moon["moon_phase"]["waxing"] is True
 
 
 def test_one_highlight_card_per_category_is_narrated_in_category_order(client: TestClient):

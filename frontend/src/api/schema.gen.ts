@@ -80,10 +80,22 @@ export interface components {
             event?: components["schemas"]["SignificantEvent"] | null;
             /** Dso Type */
             dso_type?: ("galaxy" | "nebula" | "globular_cluster" | "open_cluster") | null;
+            moon_phase?: components["schemas"]["MoonPhase"] | null;
             /** Mini Headline */
             mini_headline: string;
             /** Paragraph */
             paragraph: string;
+        };
+        /**
+         * MoonPhase
+         * @description The Moon's phase at its Peak Altitude: how much of its disk is lit, and which way that is
+         *     heading. Its Kind Sprite is drawn from it.
+         */
+        MoonPhase: {
+            /** Illuminated Fraction */
+            illuminated_fraction: number;
+            /** Waxing */
+            waxing: boolean;
         };
         /**
          * ReportRequest

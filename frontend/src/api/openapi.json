@@ -183,6 +183,16 @@
             ],
             "title": "Dso Type"
           },
+          "moon_phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoonPhase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "mini_headline": {
             "type": "string",
             "title": "Mini Headline"
@@ -208,6 +218,25 @@
         ],
         "title": "HighlightCard",
         "description": "What the Cosmic Report shows for one Highlight: its Visible body's positional fields for\nthe Detail Layer, and the card the Narrator wrote for it."
+      },
+      "MoonPhase": {
+        "properties": {
+          "illuminated_fraction": {
+            "type": "number",
+            "title": "Illuminated Fraction"
+          },
+          "waxing": {
+            "type": "boolean",
+            "title": "Waxing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "illuminated_fraction",
+          "waxing"
+        ],
+        "title": "MoonPhase",
+        "description": "The Moon's phase at its Peak Altitude: how much of its disk is lit, and which way that is\nheading. Its Kind Sprite is drawn from it."
       },
       "ReportRequest": {
         "properties": {

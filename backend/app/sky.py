@@ -48,6 +48,17 @@ class SignificantEvent:
 
 
 @dataclass(frozen=True)
+class MoonPhase:
+    """The Moon's phase at its Peak Altitude: how much of its disk is lit, and which way that is
+    heading. Its Kind Sprite is drawn from it."""
+
+    # From 0 (new) to 1 (full).
+    illuminated_fraction: float
+    # True from new Moon to full Moon, false from full Moon back to new.
+    waxing: bool
+
+
+@dataclass(frozen=True)
 class VisibleBody:
     """A catalog body that is Visible on the night, with its positional fields for the Detail Layer.
 
@@ -67,6 +78,8 @@ class VisibleBody:
     event: SignificantEvent | None = None
     # Set for a DSO, and None for every other kind of body.
     dso_type: DsoType | None = None
+    # Set for the Moon, and None for every other kind of body.
+    moon_phase: MoonPhase | None = None
 
 
 @dataclass(frozen=True)

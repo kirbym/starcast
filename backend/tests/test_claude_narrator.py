@@ -17,7 +17,7 @@ from app.narrator import (
     Narration,
     NarrationError,
 )
-from app.sky import Highlight, SignificantEvent, VisibleBody
+from app.sky import Highlight, MoonPhase, SignificantEvent, VisibleBody
 
 
 class FakeClient:
@@ -150,6 +150,22 @@ def test_narrator_reads_a_dsos_detailed_openngc_type_not_its_dso_type():
     [sent] = json.loads(client.request["messages"][0]["content"])
     assert "dso_type" not in sent
     assert sent["context"]["type"] == "double star"
+
+
+def test_narrator_reads_the_moons_phase():
+    client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
+    moon = replace(
+        JUPITER,
+        id="moon:moon",
+        object_type="moon",
+        name="Moon",
+        moon_phase=MoonPhase(illuminated_fraction=0.82, waxing=False),
+    )
+
+    ClaudeNarrator(client).narrate([Highlight(moon)])
+
+    [sent] = json.loads(client.request["messages"][0]["content"])
+    assert sent["moon_phase"] == {"illuminated_fraction": 0.82, "waxing": False}
 
 
 def test_system_prompt_names_every_raw_field():

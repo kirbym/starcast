@@ -214,6 +214,40 @@ def test_moon_less_than_half_lit_ranks_below_every_planet():
     assert category_1_highlight(sky).id == "planet:jupiter"
 
 
+@pytest.mark.parametrize(
+    ("night", "lit_between", "waxing"),
+    [
+        # From New York in November 2026: last quarter on the 1st, new Moon on the 9th, first
+        # quarter on the 17th and full Moon at 14:54 UTC on the 24th, so the Moon peaks just
+        # before full on the night of the 23rd and just after it on the night of the 24th.
+        pytest.param(date(2026, 11, 5), (0.05, 0.35), False, id="waning-crescent"),
+        pytest.param(date(2026, 11, 1), (0.4, 0.6), False, id="last-quarter"),
+        pytest.param(date(2026, 11, 12), (0.03, 0.25), True, id="waxing-crescent"),
+        pytest.param(date(2026, 11, 17), (0.4, 0.65), True, id="first-quarter"),
+        pytest.param(date(2026, 11, 20), (0.7, 0.95), True, id="waxing-gibbous"),
+        pytest.param(date(2026, 11, 23), (0.97, 1.0), True, id="full-waxing"),
+        pytest.param(date(2026, 11, 24), (0.97, 1.0), False, id="full-waning"),
+        pytest.param(date(2026, 11, 28), (0.7, 0.95), False, id="waning-gibbous"),
+    ],
+)
+def test_the_moon_carries_its_phase_at_its_peak(night, lit_between, waxing):
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", night)
+
+    phase = visible_body(sky, "moon:moon").moon_phase
+    assert phase is not None
+    low, high = lit_between
+    assert low < phase.illuminated_fraction < high
+    assert phase.waxing is waxing
+
+
+def test_only_the_moon_carries_a_moon_phase():
+    sky = compute_night_sky(*NEW_YORK, "America/New_York", date(2026, 11, 20))
+
+    assert "moon:moon" in visible_ids(sky)
+    for body in sky.visible_objects:
+        assert (body.moon_phase is not None) is (body.object_type == "moon"), body.id
+
+
 def test_peak_altitude_breaks_a_tie_between_equally_ranked_planets():
     # 2026-10-08 from New York, near new Moon: Saturn, a month past opposition, rides high in the
     # south while Jupiter only climbs out of the east before dawn. Both are gas giants.

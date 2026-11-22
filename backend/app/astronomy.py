@@ -133,8 +133,8 @@ def _category_1_priority(seen: Observation) -> tuple[int, float]:
     every Planet outranks it.
     """
     body = seen.body
-    if body.object_type == "moon":
-        lit = almanac.fraction_illuminated(load_ephemeris(), "moon", seen.peak_time) >= 0.5
+    if body.moon_phase is not None:
+        lit = body.moon_phase.illuminated_fraction >= 0.5
         tier = _MOON_TIER_HALF_LIT if lit else _MOON_TIER_THIN
     else:
         tier = _CATEGORY_1_TIERS[body.id]
