@@ -192,6 +192,227 @@ h1 {
   margin: 0 auto 0.75rem;
 }
 
+/* Kind Sprite motion: each `sprite-<motion>` class is a Motion in sprites.ts. Three cards
+   animate side by side, so every loop is slow and ambient. Layers change only opacity, or
+   step by whole sprite pixels (1px in the sprite's viewBox is 5 CSS px), so the art stays
+   crisp. Turning layers swap frames instead of rotating, which would blur them. */
+
+/* A turning layer's frames: only the first shows while the sprite holds still; in motion,
+   each shows for one step in turn. */
+.sprite-frame {
+  opacity: 0;
+  animation: sprite-turn 7.2s step-end infinite;
+  animation-delay: calc(var(--frame) * 1.8s);
+}
+
+.sprite-frame:first-child {
+  opacity: 1;
+}
+
+@keyframes sprite-turn {
+  0% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Each star of a twinkling layer, its dip offset from the last star's. */
+.sprite-twinkle {
+  animation: sprite-twinkle 5s ease-in-out infinite;
+  animation-delay: calc(var(--star) * -2.3s);
+}
+
+@keyframes sprite-twinkle {
+  0%,
+  16%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.25;
+  }
+}
+
+.sprite-flicker {
+  animation: sprite-flicker 2.4s ease-in-out infinite;
+}
+
+@keyframes sprite-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.sprite-pulse {
+  animation: sprite-pulse 6s ease-in-out infinite;
+}
+
+@keyframes sprite-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.sprite-breathe {
+  animation: sprite-breathe 9s ease-in-out infinite;
+}
+
+@keyframes sprite-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sprite-shimmer {
+  animation: sprite-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes sprite-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  55% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.65;
+  }
+}
+
+.sprite-drift {
+  animation: sprite-drift 4s step-end infinite;
+}
+
+@keyframes sprite-drift {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  25% {
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate(-1px, 1px);
+    opacity: 0.9;
+  }
+  75% {
+    opacity: 0.7;
+  }
+}
+
+.sprite-nudge-up-right {
+  animation: sprite-nudge-up-right 7s step-end infinite;
+}
+
+@keyframes sprite-nudge-up-right {
+  0%,
+  65%,
+  100% {
+    transform: none;
+  }
+  35% {
+    transform: translate(1px, -1px);
+  }
+}
+
+.sprite-nudge-down-left {
+  animation: sprite-nudge-down-left 7s step-end infinite;
+}
+
+@keyframes sprite-nudge-down-left {
+  0%,
+  65%,
+  100% {
+    transform: none;
+  }
+  35% {
+    transform: translate(-1px, 1px);
+  }
+}
+
+.sprite-brighten {
+  opacity: 0;
+  animation: sprite-brighten 5s ease-in-out infinite;
+}
+
+@keyframes sprite-brighten {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* A meteor: shows at its start, steps a pixel at a time down and to the right, then hides
+   until it streaks again. */
+.sprite-streak {
+  animation: sprite-streak 6s step-end infinite;
+}
+
+@keyframes sprite-streak {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  1% {
+    transform: translate(1px, 1px);
+  }
+  2% {
+    transform: translate(2px, 2px);
+  }
+  3% {
+    transform: translate(3px, 3px);
+  }
+  4% {
+    transform: translate(4px, 4px);
+  }
+  5% {
+    transform: translate(5px, 5px);
+  }
+  6% {
+    transform: translate(6px, 6px);
+  }
+  7% {
+    transform: translate(7px, 7px);
+  }
+  8% {
+    transform: translate(8px, 8px);
+  }
+  9%,
+  100% {
+    transform: none;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kind-sprite * {
+    animation: none;
+  }
+}
+
 /* What kind of Visible body the Highlight Card describes, closing its title. Shorter
    than the heading's line box, so it never makes the heading taller than the
    skeleton's; it wraps to the next line whole. */
