@@ -127,10 +127,11 @@ h1,
   color: var(--muted);
 }
 
-/* Stacked in one full-width column until three fixed-width cards fit side by
-   side. Then the row breaks out of the 40rem text column (the Headline keeps
-   its line length), and one or two cards keep that width, centered. Cards
-   align to the start, so expanding one's Detail Layer grows only that card. */
+/* Highlight Cards stack in one full-width column until three fixed-width
+   Highlight Cards fit side by side. Then the row breaks out of the 40rem text
+   column (the Headline keeps its line length), and one or two Highlight Cards
+   keep that width, centered. They align to the start, so expanding one's
+   Detail Layer grows only that Highlight Card. */
 .highlights {
   --card-width: 20rem;
   --card-gap: 1rem;
@@ -141,6 +142,8 @@ h1,
   margin-top: 2rem;
 }
 
+/* The row is 3 × 20rem + 2 × 1rem = 62rem, so 64rem leaves a 1rem gutter each
+   side. Custom properties can't reach a media query: keep the two in step. */
 @media (min-width: 64rem) {
   .highlights {
     grid-auto-flow: column;
@@ -164,7 +167,7 @@ h1,
   font-weight: 600;
 }
 
-/* What kind of Visible body the card describes, closing its title. Shorter
+/* What kind of Visible body the Highlight Card describes, closing its title. Shorter
    than the heading's line box, so it never makes the heading taller than the
    skeleton's; it wraps to the next line whole. */
 .highlight-kind {

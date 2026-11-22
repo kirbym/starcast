@@ -25,8 +25,8 @@ function Card({ highlight }: { highlight: HighlightCard }) {
   )
 }
 
-/** What kind of Visible body a card describes, as its title's closing label: the event's own
- * kind for a Significant Event, so every card says exactly what it is. */
+/** What kind of Visible body a Highlight Card describes, as its title's closing label: the
+ * event's own kind for a Significant Event, so every Highlight Card says exactly what it is. */
 function kindLabel(highlight: HighlightCard): string {
   if (highlight.object_type === 'significant_event' && highlight.event) {
     return EVENT_LABELS[highlight.event.event_type].kind
@@ -96,7 +96,7 @@ function EventFields({ event }: { event: SignificantEvent }) {
 }
 
 /** How the Detail Layer names each event type and the bodies it involves, and how the card's
- * title labels it. */
+ * Highlight Card's title labels it. */
 const EVENT_LABELS: Record<
   SignificantEvent['event_type'],
   { name: string; bodies: string; kind: string }
