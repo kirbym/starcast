@@ -1,5 +1,6 @@
 import json
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -137,6 +138,18 @@ def test_sends_each_highlights_raw_fields_and_context_as_json():
         "related_object_names": ["Jupiter", "Saturn"],
     }
     assert event["context"] == {"separation_degrees": 0.1}
+
+
+def test_narrator_reads_a_dsos_detailed_openngc_type_not_its_dso_type():
+    # M40 is a double star, grouped as an open cluster for its card; narration keeps the former.
+    client = FakeClient(_reply('{"headline": "Hush.", "cards": []}'))
+    m40 = replace(JUPITER, id="dso:m40", object_type="dso", name="M40", dso_type="open_cluster")
+
+    ClaudeNarrator(client).narrate([Highlight(m40, {"messier": "M40", "type": "double star"})])
+
+    [sent] = json.loads(client.request["messages"][0]["content"])
+    assert "dso_type" not in sent
+    assert sent["context"]["type"] == "double star"
 
 
 def test_system_prompt_names_every_raw_field():

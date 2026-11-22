@@ -19,8 +19,7 @@ ObjectType = Literal[
 ]
 
 
-# What kind of DSO a DSO is, grouped from its detailed OpenNGC type. It picks the DSO's sprite and
-# its Highlight Card's kind label.
+# A DSO's DSO type, grouped from its detailed OpenNGC type. Its Highlight Card is labeled by it.
 DsoType = Literal["galaxy", "nebula", "globular_cluster", "open_cluster"]
 
 

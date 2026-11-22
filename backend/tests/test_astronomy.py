@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from typing import get_args
 
 import pytest
 from skyfield.api import Loader, load, wgs84
@@ -10,6 +11,7 @@ from app.astronomy import compute_night_sky
 from app.catalog import CATALOG, DSO_TYPES, Catalog, read_data_file
 from app.comets import PINNED_ELEMENTS_ENV
 from app.observation import EPHEMERIS_FILE, data_dir
+from app.sky import DsoType
 from tests.conftest import PINNED_COMET_ELEMENTS
 
 # Published values: USNO "Astronomical Twilight for 2026" tables, retrieved 2026-11-04 from
@@ -465,7 +467,7 @@ def test_every_openngc_type_in_the_messier_catalog_maps_to_a_dso_type():
     openngc_types = {row["type"] for row in read_data_file("messier.csv")}
 
     assert openngc_types <= set(DSO_TYPES)
-    assert set(DSO_TYPES.values()) == {"galaxy", "nebula", "globular_cluster", "open_cluster"}
+    assert set(DSO_TYPES.values()) == set(get_args(DsoType))
 
 
 def test_only_dsos_carry_a_dso_type():

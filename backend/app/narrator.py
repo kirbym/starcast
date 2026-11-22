@@ -26,8 +26,15 @@ BANNED_PHRASES = (
     "shining bright",
 )
 
+# A Visible body's fields the Narrator is not given. A DSO's DSO type is for its card; context
+# carries the detailed OpenNGC type, which the narration draws on instead.
+_UNNARRATED_FIELDS = {"dso_type"}
+
 # The raw fields of each Highlight the Narrator is given: a Visible body's, then its context.
-HIGHLIGHT_FIELDS = (*(field.name for field in fields(VisibleBody)), "context")
+HIGHLIGHT_FIELDS = (
+    *(field.name for field in fields(VisibleBody) if field.name not in _UNNARRATED_FIELDS),
+    "context",
+)
 
 SYSTEM_PROMPT = f"""\
 You write StarCast's Cosmic Report: a short, personal report on what is really in one observer's
@@ -152,7 +159,8 @@ _VISIBLE_BODY = TypeAdapter(VisibleBody)
 
 def _highlight_json(highlight: Highlight) -> dict[str, Any]:
     """One Highlight as Claude reads it: the Visible body's raw fields, then its context."""
-    return {**_VISIBLE_BODY.dump_python(highlight.body, mode="json"), "context": highlight.context}
+    body = _VISIBLE_BODY.dump_python(highlight.body, mode="json", exclude=_UNNARRATED_FIELDS)
+    return {**body, "context": highlight.context}
 
 
 class ClaudeNarrator:
