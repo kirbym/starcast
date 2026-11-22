@@ -8,7 +8,7 @@ type EventType = NonNullable<HighlightCard['event']>['event_type']
  * except that a DSO is its DSO type and a Significant Event is its event type. */
 export type Kind = Exclude<ObjectType, 'dso' | 'significant_event'> | DsoType | EventType
 
-/** How a Highlight Card's title labels each kind, in the order the kinds are listed. */
+/** How a Highlight Card's title labels each kind. KINDS lists the kinds in this order. */
 export const KIND_LABELS: Record<Kind, string> = {
   planet: 'Planet',
   moon: 'Moon',

@@ -78,7 +78,7 @@ export const SPRITES: Record<Kind, Sprite> = {
         ],
       },
       {
-        name: 'body',
+        name: 'disk',
         grid: [
           '..............................',
           '..............................',
