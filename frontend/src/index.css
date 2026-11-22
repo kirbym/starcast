@@ -127,10 +127,27 @@ h1,
   color: var(--muted);
 }
 
+/* Stacked in one full-width column until three fixed-width cards fit side by
+   side. Then the row breaks out of the 40rem text column (the Headline keeps
+   its line length), and one or two cards keep that width, centered. Cards
+   align to the start, so expanding one's Detail Layer grows only that card. */
 .highlights {
+  --card-width: 20rem;
+  --card-gap: 1rem;
+
   display: grid;
-  gap: 1rem;
+  gap: var(--card-gap);
+  align-items: start;
   margin-top: 2rem;
+}
+
+@media (min-width: 64rem) {
+  .highlights {
+    grid-auto-flow: column;
+    grid-auto-columns: var(--card-width);
+    justify-content: center;
+    margin-inline: calc(50% - (3 * var(--card-width) + 2 * var(--card-gap)) / 2);
+  }
 }
 
 .highlight-card {
@@ -145,6 +162,22 @@ h1,
   margin: 0 0 0.5rem;
   font-size: 1.15rem;
   font-weight: 600;
+}
+
+/* What kind of Visible body the card describes, closing its title. Shorter
+   than the heading's line box, so it never makes the heading taller than the
+   skeleton's; it wraps to the next line whole. */
+.highlight-kind {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 
 .highlight-card p,
@@ -187,6 +220,8 @@ h1,
 
 .detail-layer dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Skeleton. Each line is exactly one line box tall (the root line-height),

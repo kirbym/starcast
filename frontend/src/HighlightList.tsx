@@ -16,11 +16,33 @@ function Card({ highlight }: { highlight: HighlightCard }) {
   const headingId = useId()
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
-      <h2 id={headingId}>{highlight.mini_headline}</h2>
+      <h2 id={headingId}>
+        {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
+      </h2>
       <p>{highlight.paragraph}</p>
       <DetailLayer highlight={highlight} />
     </article>
   )
+}
+
+/** What kind of Visible body a card describes, as its title's closing label: the event's own
+ * kind for a Significant Event, so every card says exactly what it is. */
+function kindLabel(highlight: HighlightCard): string {
+  if (highlight.object_type === 'significant_event' && highlight.event) {
+    return EVENT_LABELS[highlight.event.event_type].kind
+  }
+  return KIND_LABELS[highlight.object_type]
+}
+
+/** How a Highlight Card's title labels each kind of Visible body. */
+const KIND_LABELS: Record<HighlightCard['object_type'], string> = {
+  planet: 'Planet',
+  moon: 'Moon',
+  constellation: 'Constellation',
+  bright_star: 'Bright Star',
+  named_comet: 'Comet',
+  dso: 'Deep-Sky Object',
+  significant_event: 'Event',
 }
 
 /** The Highlight Card's Detail Layer, expanded and collapsed in place by its Details toggle.
@@ -73,11 +95,15 @@ function EventFields({ event }: { event: SignificantEvent }) {
   )
 }
 
-/** How the Detail Layer names each event type, and the bodies it involves. */
-const EVENT_LABELS: Record<SignificantEvent['event_type'], { name: string; bodies: string }> = {
-  conjunction: { name: 'Conjunction', bodies: 'Bodies' },
-  opposition: { name: 'Opposition', bodies: 'Planet' },
-  meteor_shower: { name: 'Meteor shower', bodies: 'Radiant' },
+/** How the Detail Layer names each event type and the bodies it involves, and how the card's
+ * title labels it. */
+const EVENT_LABELS: Record<
+  SignificantEvent['event_type'],
+  { name: string; bodies: string; kind: string }
+> = {
+  conjunction: { name: 'Conjunction', bodies: 'Bodies', kind: 'Conjunction' },
+  opposition: { name: 'Opposition', bodies: 'Planet', kind: 'Opposition' },
+  meteor_shower: { name: 'Meteor shower', bodies: 'Radiant', kind: 'Meteor Shower' },
 }
 
 /** "Jupiter and Saturn", or "Mars, Jupiter and Saturn". */
