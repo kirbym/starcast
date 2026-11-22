@@ -89,6 +89,10 @@ _Avoid_: "star", "fixed star", "background star"
 A non-stellar, non-solar-system object in the Messier catalog (M1–M110). Includes nebulae, galaxies, and star clusters. Treated as a Category 3 candidate.
 _Avoid_: "deep sky", "Messier object", "extended object" (use DSO)
 
+**DSO type**:
+Which of four kinds a DSO is: galaxy, nebula, globular cluster or open cluster. It groups the DSO's detailed OpenNGC type (e.g. a planetary nebula or supernova remnant is a nebula; a star cloud, double star or asterism is an open cluster). A DSO's Highlight Card is labeled by its DSO type, while the Narrator still draws on the detailed OpenNGC type. Only DSOs have one.
+_Avoid_: "DSO kind", "DSO category" (Category means the Highlight ranking group)
+
 **Named Comet**:
 A comet with an established proper name (e.g., Halley, Hale-Bopp) that appears in the catalog. Treated as a Category 3 candidate. Unlike every other body, a Named Comet counts as Visible only when its computed magnitude for the night is 6.0 or brighter, since one far from the Sun is far too faint to see.
 _Avoid_: "comet", "periodic comet" (unnamed periodic comets are not in the catalog)

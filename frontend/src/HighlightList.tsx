@@ -75,7 +75,18 @@ function kindLabel(highlight: HighlightCard): string {
   if (highlight.object_type === 'significant_event' && highlight.event) {
     return EVENT_LABELS[highlight.event.event_type].name
   }
+  if (highlight.object_type === 'dso' && highlight.dso_type) {
+    return DSO_TYPE_LABELS[highlight.dso_type]
+  }
   return KIND_LABELS[highlight.object_type]
+}
+
+/** How a DSO Highlight Card's title labels each DSO type. */
+const DSO_TYPE_LABELS: Record<NonNullable<HighlightCard['dso_type']>, string> = {
+  galaxy: 'Galaxy',
+  nebula: 'Nebula',
+  globular_cluster: 'Globular Cluster',
+  open_cluster: 'Open Cluster',
 }
 
 /** How a Highlight Card's title labels each kind of Visible body. */

@@ -166,6 +166,23 @@
               }
             ]
           },
+          "dso_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "galaxy",
+                  "nebula",
+                  "globular_cluster",
+                  "open_cluster"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dso Type"
+          },
           "mini_headline": {
             "type": "string",
             "title": "Mini Headline"

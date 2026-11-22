@@ -270,6 +270,7 @@ POSITIONAL_FIELDS = {
     "sets_at",
     "magnitude",
     "event",
+    "dso_type",
 }
 
 

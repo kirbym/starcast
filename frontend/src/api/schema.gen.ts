@@ -78,6 +78,8 @@ export interface components {
             /** Magnitude */
             magnitude: number | null;
             event?: components["schemas"]["SignificantEvent"] | null;
+            /** Dso Type */
+            dso_type?: ("galaxy" | "nebula" | "globular_cluster" | "open_cluster") | null;
             /** Mini Headline */
             mini_headline: string;
             /** Paragraph */

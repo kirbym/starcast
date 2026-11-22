@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from typing import get_args
 
 import pytest
 from skyfield.api import Loader, load, wgs84
@@ -7,9 +8,10 @@ from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import mpc
 
 from app.astronomy import compute_night_sky
-from app.catalog import CATALOG, Catalog
+from app.catalog import CATALOG, DSO_TYPES, Catalog, read_data_file
 from app.comets import PINNED_ELEMENTS_ENV
 from app.observation import EPHEMERIS_FILE, data_dir
+from app.sky import DsoType
 from tests.conftest import PINNED_COMET_ELEMENTS
 
 # Published values: USNO "Astronomical Twilight for 2026" tables, retrieved 2026-11-04 from
@@ -460,6 +462,32 @@ def test_all_110_messier_dsos_are_in_catalog_with_magnitudes():
     assert seen["dso:m22"].magnitude == pytest.approx(5.1)
 
 
+def test_every_openngc_type_in_the_messier_catalog_maps_to_a_dso_type():
+    # A new OpenNGC type in a regenerated messier.csv must be grouped before it can be served.
+    openngc_types = {row["type"] for row in read_data_file("messier.csv")}
+
+    assert openngc_types <= set(DSO_TYPES)
+    assert set(DSO_TYPES.values()) == set(get_args(DsoType))
+
+
+def test_only_dsos_carry_a_dso_type():
+    north = compute_night_sky(90.0, 0.0, "Etc/UTC", date(2026, 12, 21))
+    south = compute_night_sky(-90.0, 0.0, "Etc/UTC", date(2026, 6, 21))
+    seen = {body.id: body for body in north.visible_objects + south.visible_objects}
+
+    for body in seen.values():
+        if body.object_type == "dso":
+            assert body.dso_type == DSO_TYPES[catalog_body(body.id).context["type"]]
+        else:
+            assert body.dso_type is None
+    assert seen["dso:m31"].dso_type == "galaxy"
+    assert seen["dso:m1"].dso_type == "nebula"  # a supernova remnant
+    assert seen["dso:m13"].dso_type == "globular_cluster"
+    assert seen["dso:m40"].dso_type == "open_cluster"  # a double star
+    # The Narrator keeps the detailed OpenNGC type.
+    assert catalog_body("dso:m1").context["type"] == "supernova remnant"
+
+
 def test_visible_dso_carries_its_positional_fields_and_catalog_context():
     # Early November from New York, the Andromeda Galaxy passes almost overhead in the evening.
     sky = compute_night_sky(
@@ -468,6 +496,7 @@ def test_visible_dso_carries_its_positional_fields_and_catalog_context():
 
     andromeda = visible_body(sky, "dso:m31")
     assert andromeda.object_type == "dso"
+    assert andromeda.dso_type == "galaxy"
     assert andromeda.category == 3
     assert andromeda.name == "Andromeda Galaxy"
     assert andromeda.peak_altitude_degrees > 80
