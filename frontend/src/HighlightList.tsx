@@ -1,10 +1,11 @@
-import { useId, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { LocalTime, PositionalFields } from './PositionalFields.tsx'
 import type { HighlightCard, SignificantEvent } from './report.ts'
 
 export function HighlightList({ highlights }: { highlights: HighlightCard[] }) {
+  const listRef = useTallestSummary(highlights)
   return (
-    <section className="highlights">
+    <section className="highlights" ref={listRef}>
       {highlights.map((highlight) => (
         <Card key={highlight.id} highlight={highlight} />
       ))}
@@ -12,15 +13,58 @@ export function HighlightList({ highlights }: { highlights: HighlightCard[] }) {
   )
 }
 
+/** Keeps `--tallest-summary` on the list at the height of its tallest Highlight Card summary.
+ * Side by side, index.css makes every card at least that tall: closed cards match, and an
+ * expanded one grows past them without changing theirs. */
+function useTallestSummary(highlights: HighlightCard[]) {
+  const listRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const summaries = Array.from(list.querySelectorAll<HTMLElement>('.highlight-card-summary'))
+    const observer = new ResizeObserver(() => {
+      const tallest = Math.max(...summaries.map((summary) => summary.offsetHeight))
+      list.style.setProperty('--tallest-summary', `${tallest}px`)
+    })
+    for (const summary of summaries) observer.observe(summary)
+    return () => observer.disconnect()
+  }, [highlights])
+  return listRef
+}
+
+/** A Highlight Card: its summary (title, paragraph and Details toggle), then its Detail Layer
+ * while expanded. */
 function Card({ highlight }: { highlight: HighlightCard }) {
+  const [expanded, setExpanded] = useState(false)
   const headingId = useId()
+  const toggleId = useId()
+  const regionId = useId()
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
-      <h2 id={headingId}>
-        {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
-      </h2>
-      <p>{highlight.paragraph}</p>
-      <DetailLayer highlight={highlight} />
+      <div className="highlight-card-summary">
+        <h2 id={headingId}>
+          {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
+        </h2>
+        <p>{highlight.paragraph}</p>
+        <button
+          type="button"
+          id={toggleId}
+          className="detail-toggle"
+          aria-expanded={expanded}
+          aria-controls={regionId}
+          onClick={() => setExpanded(!expanded)}
+        >
+          Details
+        </button>
+      </div>
+      {expanded && (
+        <section id={regionId} className="detail-layer" aria-labelledby={toggleId}>
+          <dl>
+            {highlight.event && <EventFields event={highlight.event} />}
+            <PositionalFields body={highlight} />
+          </dl>
+        </section>
+      )}
     </article>
   )
 }
@@ -43,36 +87,6 @@ const KIND_LABELS: Record<HighlightCard['object_type'], string> = {
   named_comet: 'Comet',
   dso: 'Deep-Sky Object',
   significant_event: 'Event',
-}
-
-/** The Highlight Card's Detail Layer, expanded and collapsed in place by its Details toggle.
- * Collapsed, only the toggle is rendered. */
-function DetailLayer({ highlight }: { highlight: HighlightCard }) {
-  const [expanded, setExpanded] = useState(false)
-  const toggleId = useId()
-  const regionId = useId()
-  return (
-    <>
-      <button
-        type="button"
-        id={toggleId}
-        className="detail-toggle"
-        aria-expanded={expanded}
-        aria-controls={regionId}
-        onClick={() => setExpanded(!expanded)}
-      >
-        Details
-      </button>
-      {expanded && (
-        <section id={regionId} className="detail-layer" aria-labelledby={toggleId}>
-          <dl>
-            {highlight.event && <EventFields event={highlight.event} />}
-            <PositionalFields body={highlight} />
-          </dl>
-        </section>
-      )}
-    </>
-  )
 }
 
 /** What a Significant Event is, what it involves, and when it peaks. */
