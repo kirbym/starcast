@@ -1,4 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { KindSprite } from './KindSprite.tsx'
+import { KIND_LABELS, kindLabel, kindOf } from './kind.ts'
 import { LocalTime, PositionalFields } from './PositionalFields.tsx'
 import type { HighlightCard, SignificantEvent } from './report.ts'
 
@@ -32,16 +34,18 @@ function useTallestSummary(highlights: HighlightCard[]) {
   return listRef
 }
 
-/** A Highlight Card: its summary (title, paragraph and Details toggle), then its Detail Layer
- * while expanded. */
+/** A Highlight Card: its summary (Kind Sprite, title, paragraph and Details toggle), then its
+ * Detail Layer while expanded. */
 function Card({ highlight }: { highlight: HighlightCard }) {
   const [expanded, setExpanded] = useState(false)
+  const kind = kindOf(highlight)
   const headingId = useId()
   const toggleId = useId()
   const regionId = useId()
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
       <div className="highlight-card-summary">
+        {kind && <KindSprite kind={kind} />}
         <h2 id={headingId}>
           {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
         </h2>
@@ -69,46 +73,15 @@ function Card({ highlight }: { highlight: HighlightCard }) {
   )
 }
 
-/** What kind of Visible body a Highlight Card describes, as its title's closing label: the
- * event's own kind for a Significant Event, so every Highlight Card says exactly what it is. */
-function kindLabel(highlight: HighlightCard): string {
-  if (highlight.object_type === 'significant_event' && highlight.event) {
-    return EVENT_LABELS[highlight.event.event_type].name
-  }
-  if (highlight.object_type === 'dso' && highlight.dso_type) {
-    return DSO_TYPE_LABELS[highlight.dso_type]
-  }
-  return KIND_LABELS[highlight.object_type]
-}
-
-/** How a DSO Highlight Card's title labels each DSO type. */
-const DSO_TYPE_LABELS: Record<NonNullable<HighlightCard['dso_type']>, string> = {
-  galaxy: 'Galaxy',
-  nebula: 'Nebula',
-  globular_cluster: 'Globular Cluster',
-  open_cluster: 'Open Cluster',
-}
-
-/** How a Highlight Card's title labels each kind of Visible body. */
-const KIND_LABELS: Record<HighlightCard['object_type'], string> = {
-  planet: 'Planet',
-  moon: 'Moon',
-  constellation: 'Constellation',
-  bright_star: 'Bright Star',
-  named_comet: 'Comet',
-  dso: 'Deep-Sky Object',
-  significant_event: 'Event',
-}
-
 /** What a Significant Event is, what it involves, and when it peaks. */
 function EventFields({ event }: { event: SignificantEvent }) {
   return (
     <>
       <dt>Event</dt>
-      <dd>{EVENT_LABELS[event.event_type].name}</dd>
+      <dd>{KIND_LABELS[event.event_type]}</dd>
       {event.related_object_names && (
         <>
-          <dt>{EVENT_LABELS[event.event_type].bodies}</dt>
+          <dt>{EVENT_BODIES_LABELS[event.event_type]}</dt>
           <dd>{joinNames(event.related_object_names)}</dd>
         </>
       )}
@@ -120,12 +93,11 @@ function EventFields({ event }: { event: SignificantEvent }) {
   )
 }
 
-/** How each event type is named, in the Detail Layer and on its Highlight Card's title, and
- * what the Detail Layer calls the bodies it involves. */
-const EVENT_LABELS: Record<SignificantEvent['event_type'], { name: string; bodies: string }> = {
-  conjunction: { name: 'Conjunction', bodies: 'Bodies' },
-  opposition: { name: 'Opposition', bodies: 'Planet' },
-  meteor_shower: { name: 'Meteor Shower', bodies: 'Radiant' },
+/** What the Detail Layer calls the bodies each event type involves. */
+const EVENT_BODIES_LABELS: Record<SignificantEvent['event_type'], string> = {
+  conjunction: 'Bodies',
+  opposition: 'Planet',
+  meteor_shower: 'Radiant',
 }
 
 /** "Jupiter and Saturn", or "Mars, Jupiter and Saturn". */

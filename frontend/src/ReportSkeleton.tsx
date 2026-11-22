@@ -19,6 +19,7 @@ function ReportSkeleton() {
       <div className="highlights" aria-hidden="true">
         {[0, 1, 2].map((slot) => (
           <div key={slot} className="highlight-card">
+            <span className="kind-sprite skeleton-block" />
             <div className="highlight-card-heading">
               <span className="skeleton-line skeleton-line-short" />
             </div>
