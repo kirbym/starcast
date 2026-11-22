@@ -9,9 +9,11 @@ import {
   PALETTE,
   SPRITE_SIZE,
   SPRITES,
+  spriteFor,
   TRANSPARENT,
   TURN_FRAMES,
 } from './sprites.ts'
+import type { MoonPhase } from './report.ts'
 
 test('there is one sprite for each of the twelve kinds', () => {
   expect(KINDS).toEqual([
@@ -89,10 +91,14 @@ const litPixels = (phase: MoonPhaseName) =>
     .filter((layer) => layer.name === 'disk')
     .flatMap((layer) => layer.grid.join('').replaceAll(TRANSPARENT, '').split(''))
 
-/** How far right of the disk's middle its lit pixels lie on average, in sprite pixels. */
+/** How far right of the disk's middle a northern-hemisphere Moon's lit pixels lie on average. */
 function litOffset(phase: MoonPhaseName) {
-  const disk = MOON_PHASE_SPRITES[phase].layers.find((layer) => layer.name === 'disk')!
-  const xs = disk.grid.flatMap((row) =>
+  return litOffsetOf(MOON_PHASE_SPRITES[phase].layers.find((layer) => layer.name === 'disk')!.grid)
+}
+
+/** How far right of the grid's middle its painted pixels lie on average, in sprite pixels. */
+function litOffsetOf(grid: string[]) {
+  const xs = grid.flatMap((row) =>
     Array.from(row).flatMap((pixel, x) => (pixel === TRANSPARENT ? [] : [x + 0.5])),
   )
   return xs.reduce((sum, x) => sum + x, 0) / xs.length - SPRITE_SIZE / 2
@@ -151,6 +157,44 @@ test('the Moon grows from new to full and shrinks back', () => {
   waning.slice(1).forEach((phase, index) => {
     expect(litPixels(phase).length, phase).toBeLessThan(litPixels(waning[index]).length)
   })
+})
+
+/** A Moon phase the backend might send, for each phase it is drawn as. */
+const SAMPLE_PHASE: Record<MoonPhaseName, MoonPhase> = {
+  new: { illuminated_fraction: 0.01, waxing: true },
+  waxing_crescent: { illuminated_fraction: 0.2, waxing: true },
+  first_quarter: { illuminated_fraction: 0.52, waxing: true },
+  waxing_gibbous: { illuminated_fraction: 0.8, waxing: true },
+  full: { illuminated_fraction: 0.99, waxing: false },
+  waning_gibbous: { illuminated_fraction: 0.8, waxing: false },
+  last_quarter: { illuminated_fraction: 0.48, waxing: false },
+  waning_crescent: { illuminated_fraction: 0.2, waxing: false },
+}
+
+test.each(MOON_PHASES)('from the southern hemisphere the %s Moon is turned halfway round', (phase) => {
+  const north = spriteFor('moon', SAMPLE_PHASE[phase], 'northern')
+  const south = spriteFor('moon', SAMPLE_PHASE[phase], 'southern')
+  expect(north).toEqual({ sprite: MOON_PHASE_SPRITES[phase], phase })
+  expect(south.phase).toBe(phase)
+  expect(south.sprite.layers).toHaveLength(north.sprite.layers.length)
+  south.sprite.layers.forEach((layer, index) => {
+    const original = north.sprite.layers[index]
+    const turned = original.grid.map((row) => [...row].reverse().join('')).reverse()
+    expect(layer, layer.name).toEqual({ ...original, grid: turned })
+  })
+})
+
+test('from the southern hemisphere a waxing Moon is lit on its left', () => {
+  const offset = (phase: MoonPhaseName) => {
+    const { layers } = spriteFor('moon', SAMPLE_PHASE[phase], 'southern').sprite
+    return litOffsetOf(layers.find((layer) => layer.name === 'disk')!.grid)
+  }
+  expect(offset('waxing_crescent')).toBeLessThan(-1)
+  expect(offset('waning_crescent')).toBeGreaterThan(1)
+})
+
+test('only the Moon turns with the hemisphere', () => {
+  expect(spriteFor('planet', null, 'southern')).toEqual({ sprite: SPRITES.planet })
 })
 
 test('a waxing Moon is lit on its right and a waning Moon on its left', () => {

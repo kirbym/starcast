@@ -1162,15 +1162,34 @@ export const MOON_PHASE_SPRITES: Record<MoonPhaseName, Sprite> = {
   },
 }
 
+/** Which half of the Earth the sky is seen from. The Moon's sprites are drawn as it looks from
+ * the northern; from the southern it appears turned halfway round. */
+export type Hemisphere = 'northern' | 'southern'
+
 /** A Highlight Card's Kind Sprite, and for the Moon the phase it is drawn at: its night's phase,
- * or full when it has none. */
+ * or full when it has none, turned halfway round when seen from the southern hemisphere. */
 export function spriteFor(
   kind: Kind,
   moonPhase?: MoonPhase | null,
+  hemisphere: Hemisphere = 'northern',
 ): { sprite: Sprite; phase?: MoonPhaseName } {
   if (kind !== 'moon') return { sprite: SPRITES[kind] }
   const phase = moonPhase ? moonPhaseName(moonPhase) : 'full'
-  return { sprite: MOON_PHASE_SPRITES[phase], phase }
+  const sprite = MOON_PHASE_SPRITES[phase]
+  return { sprite: hemisphere === 'southern' ? turnedHalfway(sprite) : sprite, phase }
+}
+
+/** A sprite rotated 180° about its center: each grid's rows and pixels reversed, so every pixel
+ * stays crisp. */
+function turnedHalfway(sprite: Sprite): Sprite {
+  const turn = (grid: string[]) => grid.map((row) => [...row].reverse().join('')).reverse()
+  return {
+    layers: sprite.layers.map((layer) => ({
+      ...layer,
+      grid: turn(layer.grid),
+      ...(layer.frames && { frames: layer.frames.map(turn) }),
+    })),
+  }
 }
 
 /** The Kind Sprite for each kind: pixel art of what a Highlight Card of that kind describes. */

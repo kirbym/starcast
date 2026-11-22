@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HighlightList } from './HighlightList.tsx'
 import {
   clearSavedLocation,
+  hemisphereOf,
   loadSavedLocation,
   saveLocation,
   type Location,
@@ -166,7 +167,11 @@ function App() {
                   Dark from <LocalTime moment={report.report.viewing_window.starts_at} /> to{' '}
                   <LocalTime moment={report.report.viewing_window.ends_at} />
                 </p>
-                <HighlightList highlights={report.report.highlights} />
+                {/* While a report is ready, `location` is the one it was computed for. */}
+                <HighlightList
+                  highlights={report.report.highlights}
+                  hemisphere={location ? hemisphereOf(location) : 'northern'}
+                />
               </PlaceTimeZone>
             )}
           </div>

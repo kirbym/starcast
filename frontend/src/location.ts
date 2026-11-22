@@ -1,9 +1,16 @@
+import type { Hemisphere } from './sprites.ts'
+
 /** A point on Earth to report on, with the label shown in the header pill. */
 export type Location = {
   latitude: number
   longitude: number
   /** Human-readable place name, or null when none could be found. */
   label: string | null
+}
+
+/** The hemisphere a location's sky is seen from: anywhere south of the equator is southern. */
+export function hemisphereOf({ latitude }: Location): Hemisphere {
+  return latitude < 0 ? 'southern' : 'northern'
 }
 
 const STORAGE_KEY = 'starcast.location'

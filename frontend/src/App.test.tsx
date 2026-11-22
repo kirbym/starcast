@@ -1052,6 +1052,20 @@ test.each([
   expect(card.querySelector('svg.kind-sprite')).toHaveAttribute('data-moon-phase', phase)
 })
 
+test.each([
+  ['New York', 40.72, -74.0, 'northern'],
+  ['Sydney', -33.87, 151.21, 'southern'],
+  ['Quito', -0.18, -78.47, 'southern'],
+])("the Moon's Kind Sprite in %s is drawn as seen from the %s hemisphere", async (...row) => {
+  const [, latitude, longitude, hemisphere] = row
+  geolocateTo(latitude, longitude)
+  respondWith(oneCardNight(MOON))
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'Look up Moon' })
+  expect(card.querySelector('svg.kind-sprite')).toHaveAttribute('data-hemisphere', hemisphere)
+})
+
 test('the skeleton reserves a Kind Sprite placeholder above each Highlight Card title', () => {
   saveLocation({ latitude: 37.77, longitude: -122.42, label: 'San Francisco' })
   server.use(http.post(REPORT_URL, () => new Promise<never>(() => {})))
