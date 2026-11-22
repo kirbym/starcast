@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react'
 import type { Kind } from './kind.ts'
+import type { MoonPhase } from './report.ts'
 import {
   framesOf,
+  type Hemisphere,
   PALETTE,
   type PaletteColor,
   SPRITE_SIZE,
-  SPRITES,
   type SpriteLayer,
+  spriteFor,
   TRANSPARENT,
 } from './sprites.ts'
 
@@ -14,21 +16,33 @@ import {
 const PIXEL_SCALE = 5
 
 /** A Highlight Card's Kind Sprite: pixel art of its kind, drawn as SVG rects layer by layer.
- * Decorative, since the card's kind label already names the kind. Its layers move by the
- * classes index.css gives them, and hold still under prefers-reduced-motion: reduce. */
-export function KindSprite({ kind }: { kind: Kind }) {
+ * Decorative, since the card's kind label already names the kind. The Moon's is drawn at its
+ * phase, or full when it has none, as seen from the hemisphere. Its layers move by the classes
+ * index.css gives them, and hold still under prefers-reduced-motion: reduce. */
+export function KindSprite({
+  kind,
+  moonPhase,
+  hemisphere = 'northern',
+}: {
+  kind: Kind
+  moonPhase?: MoonPhase | null
+  hemisphere?: Hemisphere
+}) {
   const size = SPRITE_SIZE * PIXEL_SCALE
+  const { sprite, phase } = spriteFor(kind, moonPhase, hemisphere)
   return (
     <svg
       className="kind-sprite"
       data-kind={kind}
+      data-moon-phase={phase}
+      data-hemisphere={phase && hemisphere}
       aria-hidden="true"
       width={size}
       height={size}
       viewBox={`0 0 ${SPRITE_SIZE} ${SPRITE_SIZE}`}
       shapeRendering="crispEdges"
     >
-      {SPRITES[kind].layers.map((layer) => (
+      {sprite.layers.map((layer) => (
         <g
           key={layer.name}
           data-layer={layer.name}

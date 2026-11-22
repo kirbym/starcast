@@ -938,6 +938,7 @@ const MOON = {
   id: 'moon:moon',
   object_type: 'moon',
   name: 'Moon',
+  moon_phase: { illuminated_fraction: 0.82, waxing: false },
 } satisfies VisibleBody
 
 const COMET = {
@@ -1029,6 +1030,40 @@ test.each([
   expect(sprite.querySelectorAll('rect').length).toBeGreaterThan(0)
   const heading = within(card).getByRole('heading', { level: 2 })
   expect(sprite.nextElementSibling).toBe(heading)
+})
+
+test.each([
+  [0.01, true, 'new'],
+  [0.2, true, 'waxing_crescent'],
+  [0.5, true, 'first_quarter'],
+  [0.8, true, 'waxing_gibbous'],
+  [0.99, true, 'full'],
+  [0.99, false, 'full'],
+  [0.8, false, 'waning_gibbous'],
+  [0.5, false, 'last_quarter'],
+  [0.2, false, 'waning_crescent'],
+])("the Moon's Kind Sprite, %s lit and waxing=%s, shows the %s Moon", async (...row) => {
+  const [fraction, waxing, phase] = row
+  geolocateToNewYork()
+  respondWith(oneCardNight({ ...MOON, moon_phase: { illuminated_fraction: fraction, waxing } }))
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'Look up Moon' })
+  expect(card.querySelector('svg.kind-sprite')).toHaveAttribute('data-moon-phase', phase)
+})
+
+test.each([
+  ['New York', 40.72, -74.0, 'northern'],
+  ['Sydney', -33.87, 151.21, 'southern'],
+  ['Quito', -0.18, -78.47, 'southern'],
+])("the Moon's Kind Sprite in %s is drawn as seen from the %s hemisphere", async (...row) => {
+  const [, latitude, longitude, hemisphere] = row
+  geolocateTo(latitude, longitude)
+  respondWith(oneCardNight(MOON))
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: 'Look up Moon' })
+  expect(card.querySelector('svg.kind-sprite')).toHaveAttribute('data-hemisphere', hemisphere)
 })
 
 test('the skeleton reserves a Kind Sprite placeholder above each Highlight Card title', () => {

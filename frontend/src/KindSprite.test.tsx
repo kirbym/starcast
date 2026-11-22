@@ -3,6 +3,8 @@ import { afterEach, expect, test } from 'vitest'
 import css from './index.css?raw'
 import { KINDS } from './kind.ts'
 import { KindSprite } from './KindSprite.tsx'
+import type { MoonPhase } from './report.ts'
+import { MOON_PHASES, type MoonPhaseName } from './sprites.ts'
 
 type MotionPreference = 'no-preference' | 'reduce'
 
@@ -135,4 +137,41 @@ test('sprite motion moves only by whole pixels, in steps, and never rotates or s
     }
     unmount()
   }
+})
+
+/** A Moon phase the backend might send, for each phase it is drawn as. */
+const PHASE_OF: Record<MoonPhaseName, MoonPhase> = {
+  new: { illuminated_fraction: 0.01, waxing: true },
+  waxing_crescent: { illuminated_fraction: 0.2, waxing: true },
+  first_quarter: { illuminated_fraction: 0.52, waxing: true },
+  waxing_gibbous: { illuminated_fraction: 0.8, waxing: true },
+  full: { illuminated_fraction: 0.99, waxing: false },
+  waning_gibbous: { illuminated_fraction: 0.8, waxing: false },
+  last_quarter: { illuminated_fraction: 0.48, waxing: false },
+  waning_crescent: { illuminated_fraction: 0.2, waxing: false },
+}
+
+test.each(MOON_PHASES)('the %s Moon sprite pulses its halo and holds still on request', (phase) => {
+  for (const preference of ['no-preference', 'reduce'] as const) {
+    applyStylesheet(preference)
+    const { container, unmount } = render(<KindSprite kind="moon" moonPhase={PHASE_OF[phase]} />)
+    const sprite = container.querySelector('svg')!
+    expect(sprite).toHaveAttribute('data-moon-phase', phase)
+    const animated = animationsOf(sprite).filter(({ name }) => isAnimated(name))
+    expect(animated.map(({ element }) => element.getAttribute('data-layer'))).toEqual(
+      preference === 'reduce' ? [] : ['halo'],
+    )
+    unmount()
+    document.head.querySelectorAll('style').forEach((style) => style.remove())
+  }
+})
+
+test('only the Moon sprite is drawn by phase', () => {
+  const { container } = render(<KindSprite kind="planet" moonPhase={PHASE_OF.full} />)
+  expect(container.querySelector('svg')).not.toHaveAttribute('data-moon-phase')
+})
+
+test('a Moon sprite without a phase is drawn full', () => {
+  const { container } = render(<KindSprite kind="moon" />)
+  expect(container.querySelector('svg')).toHaveAttribute('data-moon-phase', 'full')
 })

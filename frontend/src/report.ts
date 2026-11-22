@@ -8,6 +8,9 @@ type Schemas = components['schemas']
 
 export type SignificantEvent = Schemas['SignificantEvent']
 
+/** The Moon's phase at its peak: how much of it is lit, and whether that is growing. */
+export type MoonPhase = Schemas['MoonPhase']
+
 /** What the Cosmic Report shows for one Highlight: its Visible body, mini-headline and paragraph. */
 export type HighlightCard = Schemas['HighlightCard']
 

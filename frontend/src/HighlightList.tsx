@@ -3,13 +3,21 @@ import { KindSprite } from './KindSprite.tsx'
 import { KIND_LABELS, kindLabel, kindOf } from './kind.ts'
 import { LocalTime, PositionalFields } from './PositionalFields.tsx'
 import type { HighlightCard, SignificantEvent } from './report.ts'
+import type { Hemisphere } from './sprites.ts'
 
-export function HighlightList({ highlights }: { highlights: HighlightCard[] }) {
+/** The Highlight Cards, their Kind Sprites drawn as seen from the hemisphere. */
+export function HighlightList({
+  highlights,
+  hemisphere,
+}: {
+  highlights: HighlightCard[]
+  hemisphere: Hemisphere
+}) {
   const listRef = useTallestSummary(highlights)
   return (
     <section className="highlights" ref={listRef}>
       {highlights.map((highlight) => (
-        <Card key={highlight.id} highlight={highlight} />
+        <Card key={highlight.id} highlight={highlight} hemisphere={hemisphere} />
       ))}
     </section>
   )
@@ -36,7 +44,7 @@ function useTallestSummary(highlights: HighlightCard[]) {
 
 /** A Highlight Card: its summary (Kind Sprite, title, paragraph and Details toggle), then its
  * Detail Layer while expanded. */
-function Card({ highlight }: { highlight: HighlightCard }) {
+function Card({ highlight, hemisphere }: { highlight: HighlightCard; hemisphere: Hemisphere }) {
   const [expanded, setExpanded] = useState(false)
   const kind = kindOf(highlight)
   const headingId = useId()
@@ -45,7 +53,9 @@ function Card({ highlight }: { highlight: HighlightCard }) {
   return (
     <article className="highlight-card" aria-labelledby={headingId}>
       <div className="highlight-card-summary">
-        {kind && <KindSprite kind={kind} />}
+        {kind && (
+          <KindSprite kind={kind} moonPhase={highlight.moon_phase} hemisphere={hemisphere} />
+        )}
         <h2 id={headingId}>
           {highlight.mini_headline} <span className="highlight-kind">{kindLabel(highlight)}</span>
         </h2>

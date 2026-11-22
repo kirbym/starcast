@@ -25,7 +25,7 @@ from skyfield.vectorlib import VectorFunction
 
 from app.catalog import CatalogBody
 from app.comets import CometElements, CometOrbit, NamedComet
-from app.sky import Highlight, NarrationContext, ViewingWindow, VisibleBody
+from app.sky import Highlight, MoonPhase, NarrationContext, ViewingWindow, VisibleBody
 
 _log = logging.getLogger(__name__)
 
@@ -176,6 +176,15 @@ class _Moon:
     def context(self) -> NarrationContext:
         return {}
 
+    def phase(self, moment: Time) -> MoonPhase:
+        """The Moon's phase as seen from Earth's center, which no observer's place changes."""
+        ephemeris = load_ephemeris()
+        return MoonPhase(
+            illuminated_fraction=float(almanac.fraction_illuminated(ephemeris, "moon", moment)),
+            # The Moon's ecliptic longitude east of the Sun: 0° at new, 180° at full.
+            waxing=bool(almanac.moon_phase(ephemeris, moment).degrees < 180),
+        )
+
 
 def _place(body: CatalogBody, night: Night) -> _Placement | None:
     """The body's placement for the night, or None if it cannot be placed.
@@ -225,7 +234,8 @@ def _observe(body: CatalogBody, placement: _Placement, night: Night) -> Observat
     magnitude = placement.magnitude(night.observer, peak.time)
     if not placement.is_visible(magnitude):
         return None
-    visible = _visible_body(body, night.observer, placement.target, peak, magnitude)
+    moon_phase = placement.phase(peak.time) if isinstance(placement, _Moon) else None
+    visible = _visible_body(body, night.observer, placement.target, peak, magnitude, moon_phase)
     context = {**(body.context or {}), **placement.context()} or None
     return Observation(body, visible, peak.time, track, context)
 
@@ -266,7 +276,12 @@ def _peak(track: Track, samples: Time) -> Peak | None:
 
 
 def _visible_body(
-    body: CatalogBody, observer, target, peak: Peak, magnitude: float | None
+    body: CatalogBody,
+    observer,
+    target,
+    peak: Peak,
+    magnitude: float | None,
+    moon_phase: MoonPhase | None,
 ) -> VisibleBody:
     """The body's Detail Layer fields, with rise and set taken around its peak."""
     return VisibleBody(
@@ -280,6 +295,7 @@ def _visible_body(
         sets_at=setting_after(observer, target, peak.time),
         magnitude=magnitude,
         dso_type=body.dso_type,
+        moon_phase=moon_phase,
     )
 
 

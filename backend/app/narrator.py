@@ -64,6 +64,11 @@ comet is a rare visitor rather than a fixture of the sky, so say what makes this
 tonight. Its brightness is a prediction: comets can surprise either way, and its glow is spread
 out, so it looks fainter than a star of the same magnitude.
 
+moon_phase is null except for the Moon (object_type "moon"), where it gives illuminated_fraction,
+from 0 at new Moon to 1 at full, and waxing, true while the lit part is growing toward full and
+false while it shrinks back toward new. Name the phase in words, such as a thin waxing crescent,
+first quarter or a waning gibbous, never the fraction as a number.
+
 Write one headline and one card per Highlight.
 
 Voice: conversational, with the occasional poetic flourish, always grounded in real astronomy.
