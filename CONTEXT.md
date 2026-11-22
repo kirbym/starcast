@@ -106,3 +106,7 @@ _Avoid_: "summary view", "simple view", "top-level view"
 **Detail Layer**:
 Per-Highlight-Card positional data — altitude, azimuth, rise/set times, magnitude — revealed by expanding that card. A Significant Event's Highlight Card also shows the event's type, related bodies and peak time. The Viewing Window is in the Casual Layer, not here.
 _Avoid_: "advanced view", "expanded view", "data view"
+
+**Kind Sprite**:
+The square pixel-art image of a kind of Visible body, shown centered above a Highlight Card's title in the Casual Layer: a generic planet for a Planet, stars joined by lines for a Named Constellation, and so on. There is one for each of the twelve kinds a Highlight Card's title can be labeled with: Planet, Moon, Constellation, Bright Star, Comet, each DSO type, and each Significant Event type. It always agrees with that label, and is decorative: it depicts the kind, never the particular body or the night (the Moon's is not that night's phase).
+_Avoid_: "icon", "thumbnail", "illustration", "picture"

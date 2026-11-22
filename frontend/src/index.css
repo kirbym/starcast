@@ -182,6 +182,16 @@ h1 {
   font-weight: 600;
 }
 
+/* The Highlight Card's Kind Sprite, centered above its title at its native
+   150px (30 pixels × 5), in both layouts. The skeleton's placeholder is the
+   same box. */
+.kind-sprite {
+  display: block;
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 0.75rem;
+}
+
 /* What kind of Visible body the Highlight Card describes, closing its title. Shorter
    than the heading's line box, so it never makes the heading taller than the
    skeleton's; it wraps to the next line whole. */
@@ -254,6 +264,15 @@ h1 {
   padding: 0.3em 0;
   background-clip: content-box;
   border-radius: 0.4em / 0.6em;
+}
+
+/* A solid placeholder block, such as the Kind Sprite's. */
+.skeleton-block {
+  border-radius: 0.75rem;
+}
+
+.skeleton-line,
+.skeleton-block {
   background-color: var(--skeleton-base);
   background-image: linear-gradient(
     to top right,
@@ -280,7 +299,8 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-line {
+  .skeleton-line,
+  .skeleton-block {
     animation: none;
     background-image: none;
   }

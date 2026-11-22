@@ -1000,6 +1000,51 @@ test.each([
   expect(heading.lastElementChild).toHaveTextContent(new RegExp(`^${label}$`))
 })
 
+test.each([
+  ['a planet', JUPITER, 'planet'],
+  ['the Moon', MOON, 'moon'],
+  ['a constellation', ANDROMEDA, 'constellation'],
+  ['a bright star', SIRIUS, 'bright_star'],
+  ['a named comet', COMET, 'named_comet'],
+  ['a galaxy', ANDROMEDA_GALAXY, 'galaxy'],
+  ['a nebula', CRAB_NEBULA, 'nebula'],
+  ['a globular cluster', HERCULES_CLUSTER, 'globular_cluster'],
+  ['an open cluster', PLEIADES, 'open_cluster'],
+  ['a conjunction', GREAT_CONJUNCTION, 'conjunction'],
+  ['an opposition', MARS_OPPOSITION, 'opposition'],
+  ['a meteor shower', PERSEIDS, 'meteor_shower'],
+])("shows the Kind Sprite of %s's Highlight Card above its title", async (_, body, kind) => {
+  geolocateToNewYork()
+  respondWith(oneCardNight(body))
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: /^Look up / })
+  const sprites = card.querySelectorAll('svg.kind-sprite')
+  expect(sprites).toHaveLength(1)
+  const [sprite] = sprites
+  expect(sprite).toHaveAttribute('aria-hidden', 'true')
+  expect(sprite).toHaveAttribute('data-kind', kind)
+  expect(sprite).toHaveAttribute('width', '150')
+  expect(sprite).toHaveAttribute('height', '150')
+  expect(sprite.querySelectorAll('rect').length).toBeGreaterThan(0)
+  const heading = within(card).getByRole('heading', { level: 2 })
+  expect(sprite.nextElementSibling).toBe(heading)
+})
+
+test('the skeleton reserves a Kind Sprite placeholder above each Highlight Card title', () => {
+  saveLocation({ latitude: 37.77, longitude: -122.42, label: 'San Francisco' })
+  server.use(http.post(REPORT_URL, () => new Promise<never>(() => {})))
+  renderApp()
+
+  const skeleton = screen.getByRole('status', { name: "Loading tonight's report" })
+  const placeholders = skeleton.querySelectorAll('.kind-sprite')
+  expect(placeholders).toHaveLength(3)
+  for (const placeholder of placeholders) {
+    expect(placeholder).toHaveClass('skeleton-block')
+    expect(placeholder.nextElementSibling).toHaveClass('highlight-card-heading')
+  }
+})
+
 test('shows no Highlight Cards on a Quiet Night', async () => {
   fakeGeolocation((success) =>
     success({
