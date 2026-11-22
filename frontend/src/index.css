@@ -114,10 +114,16 @@ main {
 /* Cosmic Report. The skeleton reuses these boxes, so they define the layout
    for both the loading and the loaded state. */
 
-h1,
-.headline {
+h1 {
   margin: 0;
   font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-weight: 600;
+}
+
+/* The Headline stays the page's h1, but is sized like an h3. */
+.headline {
+  margin: 0;
+  font-size: 1.17rem;
   font-weight: 600;
 }
 
@@ -130,8 +136,9 @@ h1,
 /* Highlight Cards stack in one full-width column until three fixed-width
    Highlight Cards fit side by side. Then the row breaks out of the 40rem text
    column (the Headline keeps its line length), and one or two Highlight Cards
-   keep that width, centered. They align to the start, so expanding one's
-   Detail Layer grows only that Highlight Card. */
+   keep that width, centered, all as tall as the tallest. Stacked, they align
+   to the start, so expanding one's Detail Layer grows only that Highlight
+   Card. */
 .highlights {
   --card-width: 20rem;
   --card-gap: 1rem;
@@ -145,7 +152,9 @@ h1,
 /* The row is 3 × 20rem + 2 × 1rem = 62rem, so 64rem leaves a 1rem gutter each
    side. Custom properties can't reach a media query: keep the two in step. */
 @media (min-width: 64rem) {
+  /* Side by side, every Highlight Card stretches to the tallest one's height. */
   .highlights {
+    align-items: stretch;
     grid-auto-flow: column;
     grid-auto-columns: var(--card-width);
     justify-content: center;
