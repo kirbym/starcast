@@ -89,7 +89,7 @@ export interface components {
         /**
          * MoonPhase
          * @description The Moon's phase at its Peak Altitude: how much of its disk is lit, and which way that is
-         *     heading. Its Kind Sprite is drawn from it.
+         *     heading.
          */
         MoonPhase: {
             /** Illuminated Fraction */

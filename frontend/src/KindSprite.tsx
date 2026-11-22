@@ -3,13 +3,11 @@ import type { Kind } from './kind.ts'
 import type { MoonPhase } from './report.ts'
 import {
   framesOf,
-  MOON_PHASE_SPRITES,
-  moonPhaseName,
   PALETTE,
   type PaletteColor,
   SPRITE_SIZE,
-  SPRITES,
   type SpriteLayer,
+  spriteFor,
   TRANSPARENT,
 } from './sprites.ts'
 
@@ -22,8 +20,7 @@ const PIXEL_SCALE = 5
  * still under prefers-reduced-motion: reduce. */
 export function KindSprite({ kind, moonPhase }: { kind: Kind; moonPhase?: MoonPhase | null }) {
   const size = SPRITE_SIZE * PIXEL_SCALE
-  const phase = kind === 'moon' ? (moonPhase ? moonPhaseName(moonPhase) : 'full') : undefined
-  const sprite = phase ? MOON_PHASE_SPRITES[phase] : SPRITES[kind]
+  const { sprite, phase } = spriteFor(kind, moonPhase)
   return (
     <svg
       className="kind-sprite"

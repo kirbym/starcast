@@ -1162,6 +1162,17 @@ export const MOON_PHASE_SPRITES: Record<MoonPhaseName, Sprite> = {
   },
 }
 
+/** A Highlight Card's Kind Sprite, and for the Moon the phase it is drawn at: its night's phase,
+ * or full when it has none. */
+export function spriteFor(
+  kind: Kind,
+  moonPhase?: MoonPhase | null,
+): { sprite: Sprite; phase?: MoonPhaseName } {
+  if (kind !== 'moon') return { sprite: SPRITES[kind] }
+  const phase = moonPhase ? moonPhaseName(moonPhase) : 'full'
+  return { sprite: MOON_PHASE_SPRITES[phase], phase }
+}
+
 /** The Kind Sprite for each kind: pixel art of what a Highlight Card of that kind describes. */
 export const SPRITES: Record<Kind, Sprite> = {
   planet: {

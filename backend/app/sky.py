@@ -50,7 +50,7 @@ class SignificantEvent:
 @dataclass(frozen=True)
 class MoonPhase:
     """The Moon's phase at its Peak Altitude: how much of its disk is lit, and which way that is
-    heading. Its Kind Sprite is drawn from it."""
+    heading."""
 
     # From 0 (new) to 1 (full).
     illuminated_fraction: float
