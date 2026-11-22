@@ -9,6 +9,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
+    // The Kind Sprite tests apply the real stylesheet, so keep its contents.
+    css: { include: [/index\.css/] },
     env: {
       TZ: 'America/Los_Angeles',
       VITE_API_BASE_URL: 'http://api.test',
