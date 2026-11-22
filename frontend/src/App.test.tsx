@@ -919,7 +919,7 @@ test('shows a meteor shower Highlight Card whose Detail Layer names the event, i
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
 
   const details = within(card).getByRole('region', { name: 'Details' })
-  expect(details).toHaveTextContent('EventMeteor shower')
+  expect(details).toHaveTextContent('EventMeteor Shower')
   expect(details).toHaveTextContent('RadiantPerseus')
   expect(details).toHaveTextContent('Peak1:20 AM')
 })
