@@ -114,10 +114,16 @@ main {
 /* Cosmic Report. The skeleton reuses these boxes, so they define the layout
    for both the loading and the loaded state. */
 
-h1,
-.headline {
+h1 {
   margin: 0;
   font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-weight: 600;
+}
+
+/* The Headline stays the page's h1, but is sized between an h1 and an h3. */
+.headline {
+  margin: 0;
+  font-size: 1.5rem;
   font-weight: 600;
 }
 
@@ -127,10 +133,39 @@ h1,
   color: var(--muted);
 }
 
+/* Highlight Cards stack in one full-width column until three fixed-width
+   Highlight Cards fit side by side. Then the row breaks out of the 40rem text
+   column (the Headline keeps its line length), and one or two Highlight Cards
+   keep that width, centered. Stacked, they align to the start, so expanding
+   one's Detail Layer grows only that Highlight Card. */
 .highlights {
+  --card-width: 20rem;
+  --card-gap: 1rem;
+
   display: grid;
-  gap: 1rem;
+  gap: var(--card-gap);
+  align-items: start;
   margin-top: 2rem;
+}
+
+/* The row is 3 × 20rem + 2 × 1rem = 62rem, so 64rem leaves a 1rem gutter each
+   side. Custom properties can't reach a media query: keep the two in step.
+
+   Side by side, every Highlight Card is at least as tall as the tallest
+   summary (title, paragraph and Details toggle), which HighlightList measures
+   into --tallest-summary. Closed cards so match in height, and an expanded one
+   grows past it while the others keep theirs. */
+@media (min-width: 64rem) {
+  .highlights {
+    grid-auto-flow: column;
+    grid-auto-columns: var(--card-width);
+    justify-content: center;
+    margin-inline: calc(50% - (3 * var(--card-width) + 2 * var(--card-gap)) / 2);
+  }
+
+  .highlight-card {
+    min-height: var(--tallest-summary, auto);
+  }
 }
 
 .highlight-card {
@@ -145,6 +180,22 @@ h1,
   margin: 0 0 0.5rem;
   font-size: 1.15rem;
   font-weight: 600;
+}
+
+/* What kind of Visible body the Highlight Card describes, closing its title. Shorter
+   than the heading's line box, so it never makes the heading taller than the
+   skeleton's; it wraps to the next line whole. */
+.highlight-kind {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 
 .highlight-card p,
@@ -187,6 +238,8 @@ h1,
 
 .detail-layer dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Skeleton. Each line is exactly one line box tall (the root line-height),

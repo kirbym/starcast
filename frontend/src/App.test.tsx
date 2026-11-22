@@ -625,7 +625,7 @@ test('shows a Highlight Card for each Highlight, without positional numbers', as
   renderApp()
 
   const card = await screen.findByRole('article', {
-    name: 'The king climbs the east',
+    name: 'The king climbs the east Planet',
   })
   expect(card).toHaveTextContent(
     'Jupiter rises late and climbs high before dawn, a steady lamp among the stars.',
@@ -679,7 +679,7 @@ test('shows a planet and a constellation Highlight Card together, in Category or
   renderApp()
 
   const constellation = await screen.findByRole('article', {
-    name: 'The chained princess overhead',
+    name: 'The chained princess overhead Constellation',
   })
   expect(constellation).toHaveTextContent(
     'Andromeda sails straight overhead in the evening, chained to her rock.',
@@ -687,7 +687,10 @@ test('shows a planet and a constellation Highlight Card together, in Category or
   const headings = screen
     .getAllByRole('article')
     .map((card) => card.querySelector('h2')?.textContent)
-  expect(headings).toEqual(['The king climbs the east', 'The chained princess overhead'])
+  expect(headings).toEqual([
+    'The king climbs the east Planet',
+    'The chained princess overhead Constellation',
+  ])
   for (const number of ['89.7', '351.4', '12:10', '09:41']) {
     expect(document.body).not.toHaveTextContent(number)
   }
@@ -740,7 +743,7 @@ test('shows up to three Highlight Cards, one per Category, in Category order', a
 
   renderApp()
 
-  const star = await screen.findByRole('article', { name: 'The Dog Star wakes' })
+  const star = await screen.findByRole('article', { name: 'The Dog Star wakes Bright Star' })
   expect(star).toHaveTextContent(
     'Sirius, the brightest star of all, flashes low in the south before dawn.',
   )
@@ -748,9 +751,9 @@ test('shows up to three Highlight Cards, one per Category, in Category order', a
     .getAllByRole('article')
     .map((card) => card.querySelector('h2')?.textContent)
   expect(headings).toEqual([
-    'The king climbs the east',
-    'The chained princess overhead',
-    'The Dog Star wakes',
+    'The king climbs the east Planet',
+    'The chained princess overhead Constellation',
+    'The Dog Star wakes Bright Star',
   ])
   for (const number of ['-1.44', '31.2', '168.9', '04:23', '14:57']) {
     expect(document.body).not.toHaveTextContent(number)
@@ -799,7 +802,7 @@ test('shows a Significant Event Highlight Card whose Detail Layer names its bodi
 
   renderApp()
 
-  const card = await screen.findByRole('article', { name: 'The great conjunction' })
+  const card = await screen.findByRole('article', { name: 'The great conjunction Conjunction' })
   expect(card).toHaveTextContent(
     'Jupiter and Saturn sink together in the south-west, nearly one light.',
   )
@@ -861,7 +864,7 @@ test('shows an opposition Highlight Card whose Detail Layer names the event, its
 
   renderApp()
 
-  const card = await screen.findByRole('article', { name: 'Mars at its brightest' })
+  const card = await screen.findByRole('article', { name: 'Mars at its brightest Opposition' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
 
   const details = within(card).getByRole('region', { name: 'Details' })
@@ -912,13 +915,64 @@ test('shows a meteor shower Highlight Card whose Detail Layer names the event, i
 
   renderApp()
 
-  const card = await screen.findByRole('article', { name: 'Perseids at their peak' })
+  const card = await screen.findByRole('article', { name: 'Perseids at their peak Meteor Shower' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
 
   const details = within(card).getByRole('region', { name: 'Details' })
-  expect(details).toHaveTextContent('EventMeteor shower')
+  expect(details).toHaveTextContent('EventMeteor Shower')
   expect(details).toHaveTextContent('RadiantPerseus')
   expect(details).toHaveTextContent('Peak1:20 AM')
+})
+
+/** A one-card night whose card describes `body`, under the mini headline "Look up". */
+function oneCardNight(body: VisibleBody) {
+  return {
+    ...QUIET_NIGHT,
+    headline: 'One thing to see tonight.',
+    highlights: [{ ...body, mini_headline: 'Look up', paragraph: 'It is up there.' }],
+  }
+}
+
+const MOON = {
+  ...JUPITER,
+  id: 'moon:moon',
+  object_type: 'moon',
+  name: 'Moon',
+} satisfies VisibleBody
+
+const COMET = {
+  ...SIRIUS,
+  id: 'named_comet:12p',
+  object_type: 'named_comet',
+  name: '12P/Pons-Brooks',
+} satisfies VisibleBody
+
+const ANDROMEDA_GALAXY = {
+  ...SIRIUS,
+  id: 'dso:m31',
+  object_type: 'dso',
+  name: 'Andromeda Galaxy',
+} satisfies VisibleBody
+
+test.each([
+  ['a planet', JUPITER, 'Planet'],
+  ['the Moon', MOON, 'Moon'],
+  ['a constellation', ANDROMEDA, 'Constellation'],
+  ['a bright star', SIRIUS, 'Bright Star'],
+  ['a named comet', COMET, 'Comet'],
+  ['a deep-sky object', ANDROMEDA_GALAXY, 'Deep-Sky Object'],
+  ['a conjunction', GREAT_CONJUNCTION, 'Conjunction'],
+  ['an opposition', MARS_OPPOSITION, 'Opposition'],
+  ['a meteor shower', PERSEIDS, 'Meteor Shower'],
+])("ends the title of %s's Highlight Card with its label", async (_, body, label) => {
+  geolocateToNewYork()
+  respondWith(oneCardNight(body))
+  renderApp()
+
+  const card = await screen.findByRole('article', { name: `Look up ${label}` })
+  const heading = within(card).getByRole('heading', { level: 2 })
+  expect(heading).toHaveAccessibleName(`Look up ${label}`)
+  expect(heading.lastElementChild).toHaveTextContent(new RegExp(`^${label}$`))
 })
 
 test('shows no Highlight Cards on a Quiet Night', async () => {
@@ -979,7 +1033,7 @@ test("expands a Highlight Card's Detail Layer to show its positional fields in l
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  const card = await screen.findByRole('article', { name: 'The king climbs the east' })
+  const card = await screen.findByRole('article', { name: 'The king climbs the east Planet' })
   const toggle = within(card).getByRole('button', { name: 'Details' })
   expect(detailsOf(card)).not.toBeInTheDocument()
 
@@ -1005,9 +1059,9 @@ test('expands each Highlight Card independently', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  const jupiter = await screen.findByRole('article', { name: 'The king climbs the east' })
-  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead' })
-  const polaris = screen.getByRole('article', { name: 'The pole star holds still' })
+  const jupiter = await screen.findByRole('article', { name: 'The king climbs the east Planet' })
+  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead Constellation' })
+  const polaris = screen.getByRole('article', { name: 'The pole star holds still Bright Star' })
 
   fireEvent.click(within(jupiter).getByRole('button', { name: 'Details' }))
   fireEvent.click(within(andromeda).getByRole('button', { name: 'Details' }))
@@ -1026,8 +1080,8 @@ test('says a body does not rise or set tonight when those times are null, and da
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  const polaris = await screen.findByRole('article', { name: 'The pole star holds still' })
-  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead' })
+  const polaris = await screen.findByRole('article', { name: 'The pole star holds still Bright Star' })
+  const andromeda = screen.getByRole('article', { name: 'The chained princess overhead Constellation' })
 
   fireEvent.click(within(polaris).getByRole('button', { name: 'Details' }))
   fireEvent.click(within(andromeda).getByRole('button', { name: 'Details' }))
@@ -1044,7 +1098,7 @@ test('shows no shared list of the other Visible bodies', async () => {
   geolocateToNewYork()
   respondWith(THREE_CARD_NIGHT)
   renderApp()
-  await screen.findByRole('article', { name: 'The king climbs the east' })
+  await screen.findByRole('article', { name: 'The king climbs the east Planet' })
 
   expect(screen.queryByText('Also visible tonight')).not.toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
@@ -1085,7 +1139,7 @@ test("shows every time in the place's zone, not the browser's, each naming that 
   // 02:30 and 13:10 UTC are 11:30 AM and 10:10 PM in Tokyo.
   expect(await sublineOfHeadline()).toHaveTextContent('Dark from 11:30 AM GMT+9 to 10:10 PM GMT+9')
   // Jupiter rises at 04:51 and sets at 18:30 UTC.
-  const card = screen.getByRole('article', { name: 'The king climbs the east' })
+  const card = screen.getByRole('article', { name: 'The king climbs the east Planet' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
   expect(detailsOf(card)).toHaveTextContent('Rises1:51 PM GMT+9')
   expect(detailsOf(card)).toHaveTextContent('Sets3:30 AM GMT+9')
@@ -1113,7 +1167,7 @@ test("shows a Significant Event's peak in the place's zone", async () => {
   })
   renderApp()
 
-  const card = await screen.findByRole('article', { name: 'The great conjunction' })
+  const card = await screen.findByRole('article', { name: 'The great conjunction Conjunction' })
   fireEvent.click(within(card).getByRole('button', { name: 'Details' }))
 
   // 23:11 UTC on 21 December is 8:11 the next morning in Tokyo.
